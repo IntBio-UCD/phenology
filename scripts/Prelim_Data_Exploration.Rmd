@@ -140,6 +140,172 @@ ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
   geom_histogram()
 ```
 
+### UCD 2023-2024
+
+```{r}
+UCD24 <- read_csv("../input/UCD_2023_2024_Data/UCD_mort_pheno_20240908_corrected.csv")
+```
+
+```{r}
+#apply lubridate
+UCD24$bud.date <- mdy(UCD24$bud.date)
+UCD24$flower.date <- mdy(UCD24$flower.date)
+UCD24$fruit.date <- mdy(UCD24$fruit.date)
+UCD24$last.FL.date <- mdy(UCD24$last.FL.date)
+UCD24$last.FR.date <- mdy(UCD24$last.FR.date)
+UCD24$death.date <- mdy(UCD24$death.date)
+UCD24$missing.date <- mdy(UCD24$missing.date)
+```
+
+```{r}
+bud2021 <- UCD24[year(UCD24$bud.date) == 2021,]
+print(bud2021)
+
+# Directly update the date of the 2021 entry
+UCD24[UCD24$bed == "A" & 
+                       UCD24$row == 15 & 
+                       UCD24$col == "A", "bud.date"] <- 
+  update(UCD24[UCD24$bed == "A" & 
+                                UCD24$row == 15 & 
+                                UCD24$col == "A", "bud.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "A" & 
+                             UCD24$row == 15 & 
+                             UCD24$col == "A", ])
+```
+
+```{r}
+bud2014 <- UCD24[year(UCD24$bud.date) == 2014,]
+print(bud2014)
+
+# Directly update the date of the 2014 entry
+UCD24[UCD24$bed == "C" & 
+                       UCD24$row == 35 & 
+                       UCD24$col == "D", "bud.date"] <- 
+  update(UCD24[UCD24$bed == "C" & 
+                                UCD24$row == 35 & 
+                                UCD24$col == "D", "bud.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "C" & 
+                             UCD24$row == 35 & 
+                             UCD24$col == "D", ])
+```
+
+```{r}
+flw2023 <- UCD24[year(UCD24$flower.date) == 2023,]
+print(flw2023)
+
+# Directly update the date of the 2023 entry
+UCD24[UCD24$bed == "A" & 
+                       UCD24$row == 17 & 
+                       UCD24$col == "C", "flower.date"] <- 
+  update(UCD24[UCD24$bed == "A" & 
+                                UCD24$row == 17 & 
+                                UCD24$col == "C", "flower.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "A" & 
+                             UCD24$row == 17 & 
+                             UCD24$col == "C", ])
+
+# Directly update the date of the 2023 entry
+UCD24[UCD24$bed == "A" & 
+                       UCD24$row == 17 & 
+                       UCD24$col == "C", "fruit.date"] <- 
+  update(UCD24[UCD24$bed == "A" & 
+                                UCD24$row == 17 & 
+                                UCD24$col == "C", "fruit.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "A" & 
+                             UCD24$row == 17 & 
+                             UCD24$col == "C", ])
+
+```
+
+```{r}
+# Directly update the date of the 2014 entry
+UCD24[UCD24$bed == "B" & 
+                       UCD24$row == 14 & 
+                       UCD24$col == "A", "fruit.date"] <- 
+  update(UCD24[UCD24$bed == "B" & 
+                                UCD24$row == 14 & 
+                                UCD24$col == "A", "fruit.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "B" & 
+                             UCD24$row == 14 & 
+                             UCD24$col == "A", ])
+```
+
+```{r}
+# Directly update the date of the 2014 entry
+UCD24[UCD24$bed == "D" & 
+                       UCD24$row == 44 & 
+                       UCD24$col == "D", "last.FL.date"] <- 
+  update(UCD24[UCD24$bed == "D" & 
+                                UCD24$row == 44 & 
+                                UCD24$col == "D", "last.FL.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "D" & 
+                             UCD24$row == 44 & 
+                             UCD24$col == "D", ])
+```
+
+```{r}
+#CHECK THIS ONE, LAST FR DATE BEFORE LAST FLOWER DATE!!!!
+# Directly update the date of the 2014 entry
+UCD24[UCD24$bed == "F" & 
+                       UCD24$row == 33 & 
+                       UCD24$col == "C", "last.FR.date"] <- 
+  update(UCD24[UCD24$bed == "F" & 
+                                UCD24$row == 33 & 
+                                UCD24$col == "C", "last.FR.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "F" & 
+                             UCD24$row == 33 & 
+                             UCD24$col == "C", ])
+```
+
+```{r}
+# Directly update the date of the 2014 entry
+UCD24[UCD24$bed == "C" & 
+                       UCD24$row == 31 & 
+                       UCD24$col == "C", "last.FR.date"] <- 
+  update(UCD24[UCD24$bed == "C" & 
+                                UCD24$row == 31 & 
+                                UCD24$col == "C", "last.FR.date"][[1]], 
+         year = 2024)
+
+# Verify the updated date
+print(UCD24[UCD24$bed == "C" & 
+                             UCD24$row == 31 & 
+                             UCD24$col == "C", ])
+```
+
+```{r}
+#Need to add in pop.id
+ggplot(UCD24, aes(x=bud.date)) +
+  geom_histogram()
+
+ggplot(UCD24, aes(x=flower.date)) +
+  geom_histogram()
+
+ggplot(UCD24, aes(x=fruit.date)) +
+  geom_histogram()
+```
+
 ### WL2 2023
 
 ```{r}
