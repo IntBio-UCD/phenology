@@ -1,6 +1,8 @@
 ---
 title: "Preliminary Data Exploration"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 date: "2024-10-16"
 ---
 
@@ -12,12 +14,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyverse)
 library(lubridate)
+library(lme4)
 ```
 
 ### UCD 2022-2023 Transplants
 
 ```{r}
-UCD_pheno_transplant <- read_csv("../input/UCD_Data/Phenology_survey_transplants_20230508_corrected.csv")
+UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/Phenology_survey_transplants_20230508_corrected.csv")
 ```
 
 #### Renaming columns to remove spaces between words
@@ -54,7 +57,7 @@ ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Bud)) +
   geom_histogram()
 ```
 
-##### Identify which row has the wrong year 
+##### Identify which row has the wrong year
 
 ```{r}
 # one first bud date seems to be 2022 which is not correct
@@ -94,10 +97,16 @@ ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Fruit, fill=pop)) +
   geom_histogram()
 ```
 
+```{r}
+#m1 <- glmer(Date_First_Bud ~ 1 + (1|pop),
+           # family=gaussian,
+           # data=UCD_pheno_transplant)
+```
+
 ### UCD 2022-2023 Germinants
 
 ```{r}
-UCD_pheno_germ <- read_csv("../input/UCD_Data/Phenology_survey_germination_20230515_corrected.csv")
+UCD_pheno_germ <- read_csv("../input/UCD_2023_Data/Phenology_survey_germination_20230515_corrected.csv")
 ```
 
 #### Renaming columns to remove spaces between words and apply lubridate
@@ -134,7 +143,7 @@ ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
 ### WL2 2023
 
 ```{r}
-WL2_pheno <- read_csv("../input/WL2_Data/WL2_mort_pheno_20231020_corrected.csv")
+WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.csv")
 ```
 
 #### Apply lubridate
@@ -187,3 +196,7 @@ ggplot(WL2_pheno_filter, aes(x=flower.date, fill=pop)) +
 ggplot(WL2_pheno_filter, aes(x=fruit.date, fill=pop)) +
   geom_histogram()
 ```
+
+Plot as proportions of plants that were planted
+
+Likelihood of flowering given budding
