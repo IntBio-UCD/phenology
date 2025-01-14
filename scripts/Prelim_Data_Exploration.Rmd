@@ -144,6 +144,9 @@ ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
 
 ```{r}
 UCD24 <- read_csv("../input/UCD_2023_2024_Data/UCD_mort_pheno_20240908_corrected.csv")
+
+#need to get pop info from uniqueIDs
+
 ```
 
 ```{r}
@@ -381,22 +384,29 @@ WL2_24$death.date <- mdy(WL2_24$death.date)
 WL2_24$missing.date <- mdy(WL2_24$missing.date)
 ```
 
-\_histogram()
+```{r}
+#creating column with only pop info
+WL2_24_pop <- WL2_24 %>%
+  mutate(pop = case_when(
+    grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^(\\w+)_\\d+_\\d+$", "\\1", unique.ID),
+    TRUE ~ unique.ID
+  ))
+```
 
 ```{r}
-ggplot(WL2_24, aes(x=bud.date, fill=unique.ID)) +
+ggplot(WL2_24_pop, aes(x=bud.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_24, aes(x=flower.date, fill=unique.ID)) +
+ggplot(WL2_24_pop, aes(x=flower.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_24, aes(x=fruit.date, fill=unique.ID)) +
+ggplot(WL2_24_pop, aes(x=fruit.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_24, aes(x=last.FL.date, fill=unique.ID)) +
+ggplot(WL2_24_pop, aes(x=last.FL.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_24, aes(x=last.FR.date, fill=unique.ID)) +
+ggplot(WL2_24_pop, aes(x=last.FR.date, fill=pop)) +
   geom_histogram()
 ```
 
