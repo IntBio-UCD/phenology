@@ -363,6 +363,43 @@ ggplot(WL2_pheno_filter, aes(x=fruit.date, fill=pop)) +
   geom_histogram()
 ```
 
+### WL2 2024
+
+```{r}
+WL2_24 <- read_csv("../input/WL2_2024_Data/WL2_mort_pheno_20241023_corrected.csv")
+
+```
+
+```{r}
+#apply lubridate
+WL2_24$bud.date <- mdy(WL2_24$bud.date)
+WL2_24$flower.date <- mdy(WL2_24$flower.date)
+WL2_24$fruit.date <- mdy(WL2_24$fruit.date)
+WL2_24$last.FL.date <- mdy(WL2_24$last.FL.date)
+WL2_24$last.FR.date <- mdy(WL2_24$last.FR.date)
+WL2_24$death.date <- mdy(WL2_24$death.date)
+WL2_24$missing.date <- mdy(WL2_24$missing.date)
+```
+
+\_histogram()
+
+```{r}
+ggplot(WL2_24, aes(x=bud.date, fill=unique.ID)) +
+  geom_histogram()
+
+ggplot(WL2_24, aes(x=flower.date, fill=unique.ID)) +
+  geom_histogram()
+
+ggplot(WL2_24, aes(x=fruit.date, fill=unique.ID)) +
+  geom_histogram()
+
+ggplot(WL2_24, aes(x=last.FL.date, fill=unique.ID)) +
+  geom_histogram()
+
+ggplot(WL2_24, aes(x=last.FR.date, fill=unique.ID)) +
+  geom_histogram()
+```
+
 Plot as proportions of plants that were planted
 
 Likelihood of flowering given budding
