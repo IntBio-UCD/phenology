@@ -30,7 +30,7 @@ UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/Phenology_survey_transp
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Bud"] <- "Date_First_Bud"
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Fruit"] <- "Date_First_Fruit"
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Flower"] <- "Date_First_Flower"
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Flower"] <- "Date_Last_FLower"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Flower"] <- "Date_Last_Flower"
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Fruit"] <- "Date_Last_Fruit"
 
 ```
@@ -41,20 +41,21 @@ colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Frui
 UCD_pheno_transplant$Date_First_Bud <- mdy(UCD_pheno_transplant$Date_First_Bud)
 UCD_pheno_transplant$Date_First_Flower <- mdy(UCD_pheno_transplant$Date_First_Flower)
 UCD_pheno_transplant$Date_First_Fruit <- mdy(UCD_pheno_transplant$Date_First_Fruit)
-#UCD_pheno_transplant$Date_Last_Flower <- mdy(UCD_pheno_transplant$Date_Last_Flower) #no last flower dates
-#UCD_pheno_transplant$Date_Last_Fruit <- mdy(UCD_pheno_transplant$Date_Last_Fruit) #no last fruit dates
+UCD_pheno_transplant$Date_Last_Flower <- mdy(UCD_pheno_transplant$Date_Last_Flower) #no last flower dates
+UCD_pheno_transplant$Date_Last_Fruit <- mdy(UCD_pheno_transplant$Date_Last_Fruit) #no last fruit dates
 ```
 
-#### Filter to only include individuals that budded
+#### Filter to only include individuals that budded - don't know if I should use this
 
 ```{r}
-UCD_pheno_trans_filter <- UCD_pheno_transplant[!is.na(UCD_pheno_transplant$Date_First_Bud) | !is.na(UCD_pheno_transplant$Date_First_Flower), ]
+
+#UCD_pheno_trans_filter <- UCD_pheno_transplant[!is.na(UCD_pheno_transplant$Date_First_Bud) | !is.na(UCD_pheno_transplant$Date_First_Flower), ]
 ```
 
 #### Visualize bud date - the year for one individual is wrong
 
 ```{r}
-ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Bud)) +
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud)) +
   geom_histogram()
 ```
 
@@ -62,7 +63,7 @@ ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Bud)) +
 
 ```{r}
 # one first bud date seems to be 2022 which is not correct
-bud2022 <- UCD_pheno_trans_filter[year(UCD_pheno_trans_filter$Date_First_Bud) == 2022,]
+bud2022 <- UCD_pheno_transplant[year(UCD_pheno_transplant$Date_First_Bud) == 2022,]
 print(bud2022)
 ```
 
@@ -70,31 +71,60 @@ print(bud2022)
 
 ```{r}
 # Directly update the date of the 2022 entry
-UCD_pheno_trans_filter[UCD_pheno_trans_filter$block == "L1" & 
-                       UCD_pheno_trans_filter$row == 4 & 
-                       UCD_pheno_trans_filter$col == "A", "Date_First_Bud"] <- 
-  update(UCD_pheno_trans_filter[UCD_pheno_trans_filter$block == "L1" & 
-                                UCD_pheno_trans_filter$row == 4 & 
-                                UCD_pheno_trans_filter$col == "A", "Date_First_Bud"][[1]], 
+UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
+                       UCD_pheno_transplant$row == 4 & 
+                       UCD_pheno_transplant$col == "A", "Date_First_Bud"] <- 
+  update(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
+                                UCD_pheno_transplant$row == 4 & 
+                                UCD_pheno_transplant$col == "A", "Date_First_Bud"][[1]], 
          year = 2023)
 
 # Verify the updated date
-print(UCD_pheno_trans_filter[UCD_pheno_trans_filter$block == "L1" & 
-                             UCD_pheno_trans_filter$row == 4 & 
-                             UCD_pheno_trans_filter$col == "A", ])
+print(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
+                             UCD_pheno_transplant$row == 4 & 
+                             UCD_pheno_transplant$col == "A", ])
 
+```
+
+```{r}
+#change date to days since planting
+
+UCD_pheno_transplant <- UCD_pheno_transplant %>%
+  mutate(
+    planting_date = case_when(
+      grepl("^D", block) ~ mdy("11/29/2022"),
+      grepl("^[FHLJ]", block) ~ mdy("11/30/2022"),
+      TRUE ~ NA_Date_
+    )
+  )
+
+UCD_pheno_transplant <- UCD_pheno_transplant %>%
+  mutate(across(starts_with("Date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
 ```
 
 #### Visualize bud, flower, and fruit dates
 
 ```{r}
-ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Bud, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud, fill=pop)) +
   geom_histogram()
 
-ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Flower, fill=pop))+
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower, fill=pop))+
   geom_histogram()
 
-ggplot(UCD_pheno_trans_filter, aes(x=Date_First_Fruit, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit, fill=pop)) +
+  geom_histogram()
+```
+
+#### Visualize as bud/flower/fruit day from planting
+
+```{r}
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower_dfp, fill=pop))+
+  geom_histogram()
+
+ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit_dfp, fill=pop)) +
   geom_histogram()
 ```
 
@@ -117,15 +147,30 @@ UCD_pheno_germ <- read_csv("../input/UCD_2023_Data/Phenology_survey_germination_
 colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Bud"] <- "Date_First_Bud"
 colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Fruit"] <- "Date_First_Fruit"
 colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Flower"] <- "Date_First_Flower"
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Flower"] <- "Date_Last_FLower"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Flower"] <- "Date_Last_Flower"
 colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Fruit"] <- "Date_Last_Fruit"
 
 #apply lubridate
 UCD_pheno_germ$Date_First_Bud <- mdy(UCD_pheno_germ$Date_First_Bud)
 UCD_pheno_germ$Date_First_Flower <- mdy(UCD_pheno_germ$Date_First_Flower)
 UCD_pheno_germ$Date_First_Fruit <- mdy(UCD_pheno_germ$Date_First_Fruit)
-#UCD_pheno_germ$Date_Last_Flower <- mdy(UCD_pheno_germ$Date_Last_Flower) #no last flower dates
+UCD_pheno_germ$Date_Last_Flower <- mdy(UCD_pheno_germ$Date_Last_Flower) #no last flower dates
 UCD_pheno_germ$Date_Last_Fruit <- mdy(UCD_pheno_germ$Date_Last_Fruit)
+```
+
+```{r}
+#change date to days since planting
+
+UCD_pheno_germ <- UCD_pheno_germ %>%
+  mutate(
+    planting_date = case_when(
+      grepl("^[BCEGIKMN]", block) ~ mdy("12/2/2022"),
+      TRUE ~ NA_Date_
+    )
+  )
+
+UCD_pheno_germ <- UCD_pheno_germ %>%
+  mutate(across(starts_with("Date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
 ```
 
 #### Visualize bud, flower, and fruit dates
@@ -138,6 +183,19 @@ ggplot(UCD_pheno_germ, aes(x=Date_First_Flower, fill=pop)) +
   geom_histogram()
 
 ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
+  geom_histogram()
+```
+
+#### Visualize as bud/flower/fruit day from planting
+
+```{r}
+ggplot(UCD_pheno_germ, aes(x=Date_First_Bud_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_pheno_germ, aes(x=Date_First_Flower_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit_dfp, fill=pop)) +
   geom_histogram()
 ```
 
@@ -313,6 +371,15 @@ print(UCD24_pop[UCD24_pop$bed == "C" &
 ```
 
 ```{r}
+planting_date <- mdy("12/04/2023")
+
+UCD24_pop <- UCD24_pop %>%
+  mutate(across(ends_with(".date") & !matches("census.date"),
+                ~ as.integer(ymd(.) - planting_date),
+                .names="{.col}_dfp"))
+```
+
+```{r}
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=bud.date, fill=pop.id)) +
@@ -337,6 +404,43 @@ UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=last.FR.date, fill=pop.id)) +
   geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=death.date, fill=pop.id)) +
+  geom_histogram()
+```
+
+```{r}
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=bud.date_dfp, fill=pop.id)) +
+  geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=flower.date_dfp, fill=pop.id)) +
+  geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=fruit.date_dfp, fill=pop.id)) +
+  geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=last.FL.date_dfp, fill=pop.id)) +
+  geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=last.FR.date_dfp, fill=pop.id)) +
+  geom_histogram()
+
+UCD24_pop %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=death.date_dfp, fill=pop.id)) +
+  geom_histogram()
 ```
 
 ### WL2 2023
@@ -352,47 +456,76 @@ WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.
 WL2_pheno$bud.date <- mdy(WL2_pheno$bud.date)
 WL2_pheno$flower.date <- mdy(WL2_pheno$flower.date)
 WL2_pheno$fruit.date <- mdy(WL2_pheno$fruit.date)
-#WL2_pheno$last.flower.date <- mdy(WL2_pheno$last.flower.date)
-#WL2_pheno$last.fruit.date <- mdy(WL2_pheno$last.fruit.date)
+WL2_pheno$last.flower.date <- mdy(WL2_pheno$last.flower.date)
+WL2_pheno$last.fruit.date <- mdy(WL2_pheno$last.fruit.date)
+WL2_pheno$death.date <- mdy(WL2_pheno$death.date)
 ```
 
-#### Filter to only include individuals that budded
+#### Filter to only include individuals that budded - don't think I want this
 
 ```{r}
-WL2_pheno_filter <- WL2_pheno[!is.na(WL2_pheno$bud.date),]
+#WL2_pheno_filter <- WL2_pheno[!is.na(WL2_pheno$bud.date),]
 ```
 
 #### One individual has the wrong fruit date year, correct to say 2023
 
 ```{r}
 #one of the fruit dates says 2013
-fruit2014 <- WL2_pheno_filter[year(WL2_pheno_filter$fruit.date) == 2013,]
+fruit2014 <- WL2_pheno[year(WL2_pheno$fruit.date) == 2013,]
 print(fruit2014)
 
 # Directly update the date of the 2013 entry
-WL2_pheno_filter[WL2_pheno_filter$block == "A" & 
-                       WL2_pheno_filter$bed == "A" & 
-                       WL2_pheno_filter$bed.row == 23 & WL2_pheno_filter$bed.col == "D", "fruit.date"] <- 
-  update(WL2_pheno_filter[WL2_pheno_filter$block == "A" & 
-                       WL2_pheno_filter$bed == "A" & 
-                       WL2_pheno_filter$bed.row == 23 & WL2_pheno_filter$bed.col == "D", "fruit.date"][[1]], year = 2023)
+WL2_pheno[WL2_pheno$block == "A" & 
+                       WL2_pheno$bed == "A" & 
+                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", "fruit.date"] <- 
+  update(WL2_pheno[WL2_pheno$block == "A" & 
+                       WL2_pheno$bed == "A" & 
+                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", "fruit.date"][[1]], year = 2023)
 
 # Verify the updated date
-print(WL2_pheno_filter[WL2_pheno_filter$block == "A" & 
-                       WL2_pheno_filter$bed == "A" & 
-                       WL2_pheno_filter$bed.row == 23 & WL2_pheno_filter$bed.col == "D", ])
+print(WL2_pheno[WL2_pheno$block == "A" & 
+                       WL2_pheno$bed == "A" & 
+                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", ])
+```
+
+```{r}
+#THIS PLANTING IS HARDER TO ASSIGN A PLANTING DAY SINCE IT IS DONE BY BLOCK
+#For now I will call the planting date the day when all the plants were in
+WL2_23_planting_date <- mdy("07/19/2023")
+
+WL2_pheno <- WL2_pheno %>%
+  mutate(across(ends_with(".date"),
+                ~ as.integer(ymd(.) - planting_date),
+                .names="{.col}_dfp"))
 ```
 
 #### Visualize bud, flower, and fruit dates
 
 ```{r}
-ggplot(WL2_pheno_filter, aes(x=bud.date, fill=pop)) +
+ggplot(WL2_pheno, aes(x=bud.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_pheno_filter, aes(x=flower.date, fill=pop)) +
+ggplot(WL2_pheno, aes(x=flower.date, fill=pop)) +
   geom_histogram()
 
-ggplot(WL2_pheno_filter, aes(x=fruit.date, fill=pop)) +
+ggplot(WL2_pheno, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_pheno, aes(x=death.date, fill=pop)) +
+  geom_histogram()
+```
+
+```{r}
+ggplot(WL2_pheno, aes(x=bud.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_pheno, aes(x=flower.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_pheno, aes(x=fruit.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_pheno, aes(x=death.date_dfp, fill=pop)) +
   geom_histogram()
 ```
 
@@ -424,6 +557,18 @@ WL2_24_pop <- WL2_24 %>%
 ```
 
 ```{r}
+WL2_24_pop <- WL2_24_pop %>%
+  mutate(
+    planting_date = if_else(is.na(block), WL2_23_planting_date, NA_Date_)
+  ) %>%
+  mutate(across(
+    ends_with(".date"),  
+    ~ if_else(is.na(block), as.integer(ymd(.) - WL2_23_planting_date), NA_integer_),  
+    .names = "{.col}_dfp"  
+  ))
+```
+
+```{r}
 ggplot(WL2_24_pop, aes(x=bud.date, fill=pop)) +
   geom_histogram()
 
@@ -438,6 +583,29 @@ ggplot(WL2_24_pop, aes(x=last.FL.date, fill=pop)) +
 
 ggplot(WL2_24_pop, aes(x=last.FR.date, fill=pop)) +
   geom_histogram()
+
+#ggplot(WL2_24_pop, aes(x=death.date, fill=pop)) +
+  #geom_histogram()
+```
+
+```{r}
+ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_24_pop, aes(x=flower.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_24_pop, aes(x=fruit.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
+  geom_histogram()
+
+#ggplot(WL2_24_pop, aes(x=death.date_dfp, fill=pop)) +
+  #geom_histogram()
 ```
 
 Plot as proportions of plants that were planted
