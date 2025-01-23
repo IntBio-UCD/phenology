@@ -16,6 +16,7 @@ library(tidyverse)
 library(lubridate)
 library(lme4)
 library(googlesheets4)
+library(lmtest)
 ```
 
 ### UCD 2022-2023 Transplants
@@ -86,9 +87,9 @@ print(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" &
 
 ```
 
-```{r}
-#change date to days since planting
+#### Change date to days since planting
 
+```{r}
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
   mutate(
     planting_date = case_when(
@@ -119,14 +120,19 @@ ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit, fill=pop)) +
 
 ```{r}
 ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Bud")
 
 ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower_dfp, fill=pop))+
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Flower")
 
 ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Fruit")
 ```
+
+#### Calculate proportions of total planted for each reproductive stage by pop
 
 ```{r}
 UCD_trans_prop <- UCD_pheno_transplant %>%
@@ -143,8 +149,9 @@ UCD_trans_prop <- UCD_pheno_transplant %>%
                values_to="proportion")
 ```
 
+#### Only include populations with non-zero proportion for bud date
+
 ```{r}
-#only include populations with non-zero proportion for bud date
 UCD_trans_prop_non_zero_bud <- UCD_trans_prop %>%
   filter(stage == "prop_bud" & proportion > 0) %>%
   pull(pop)
@@ -153,13 +160,15 @@ UCD_trans_prop_filter <- UCD_trans_prop %>%
   filter(pop %in% UCD_trans_prop_non_zero_bud)
 ```
 
+#### Visualize proportions
+
 ```{r}
 ggplot(UCD_trans_prop_filter, aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
   facet_wrap(~pop, ncol = 4) +
-  labs(x="Phenological Stage", y="Proportion") +
+  labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -194,9 +203,9 @@ UCD_pheno_germ$Date_Last_Flower <- mdy(UCD_pheno_germ$Date_Last_Flower) #no last
 UCD_pheno_germ$Date_Last_Fruit <- mdy(UCD_pheno_germ$Date_Last_Fruit)
 ```
 
-```{r}
-#change date to days since planting
+#### Change date to days since planting
 
+```{r}
 UCD_pheno_germ <- UCD_pheno_germ %>%
   mutate(
     planting_date = case_when(
@@ -226,14 +235,19 @@ ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
 
 ```{r}
 ggplot(UCD_pheno_germ, aes(x=Date_First_Bud_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Bud")
 
 ggplot(UCD_pheno_germ, aes(x=Date_First_Flower_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Flower")
 
 ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+   xlab("Days since planting, Fruit")
 ```
+
+#### Calculate proportion of total planted for each reproductive stage by pop
 
 ```{r}
 UCD_germ_prop <- UCD_pheno_germ %>%
@@ -249,13 +263,30 @@ UCD_germ_prop <- UCD_pheno_germ %>%
                values_to="proportion")
 ```
 
+#### Visualize proportions
+
 ```{r}
 ggplot(UCD_germ_prop, aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
   facet_wrap(~pop, ncol = 4) +
-  labs(x="Phenological Stage", y="Proportion") +
+  labs(x="Reproductive Stage", y="Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Visualize proportion for just TM2
+
+```{r}
+UCD_germ_prop %>%
+  filter(pop == "TM2") %>%
+  ggplot(aes(x=stage, y=proportion, fill=stage)) + 
+  geom_bar(stat="identity", show.legend=FALSE) +
+  geom_text(aes(label=paste0("Total: ", total_individuals)),
+            position = position_stack(vjust = 1.1), size = 2, color = "black") +
+  facet_wrap(~pop, ncol = 4) +
+  labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -271,8 +302,9 @@ parent_pop_info <- read_sheet(url, sheet="parent pop labels and germination")
 
 ```
 
+#### Add pop column for parent pops using unique.ID
+
 ```{r}
-#add pop column for parent pops using unique.ID
 UCD24_pop <- UCD24 %>%
   left_join(
     parent_pop_info %>%
@@ -282,8 +314,9 @@ UCD24_pop <- UCD24 %>%
   )
 ```
 
+#### Apply lubridate
+
 ```{r}
-#apply lubridate
 UCD24_pop$bud.date <- mdy(UCD24_pop$bud.date)
 UCD24_pop$flower.date <- mdy(UCD24_pop$flower.date)
 UCD24_pop$fruit.date <- mdy(UCD24_pop$fruit.date)
@@ -293,6 +326,8 @@ UCD24_pop$death.date <- mdy(UCD24_pop$death.date)
 UCD24_pop$missing.date <- mdy(UCD24_pop$missing.date)
 
 ```
+
+#### Fix incorrect dates
 
 ```{r}
 bud2021 <- UCD24_pop[year(UCD24_pop$bud.date) == 2021,]
@@ -431,6 +466,8 @@ print(UCD24_pop[UCD24_pop$bed == "C" &
                              UCD24_pop$col == "C", ])
 ```
 
+#### Change date to days since planting
+
 ```{r}
 planting_date <- mdy("12/04/2023")
 
@@ -439,6 +476,8 @@ UCD24_pop <- UCD24_pop %>%
                 ~ as.integer(ymd(.) - planting_date),
                 .names="{.col}_dfp"))
 ```
+
+#### Visualize with date of stage
 
 ```{r}
 UCD24_pop %>%
@@ -472,37 +511,46 @@ UCD24_pop %>%
   geom_histogram()
 ```
 
+#### Visualize with day since planting
+
 ```{r}
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=bud.date_dfp, fill=pop.id)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Bud")
 
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=flower.date_dfp, fill=pop.id)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Flower")
 
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=fruit.date_dfp, fill=pop.id)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Fruit")
 
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=last.FL.date_dfp, fill=pop.id)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Last Flower")
 
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=last.FR.date_dfp, fill=pop.id)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Last Fruit")
 
 UCD24_pop %>%
   filter(!is.na(pop.id)) %>%
   ggplot(aes(x=death.date_dfp, fill=pop.id)) +
   geom_histogram()
 ```
+
+#### Calculate proportions
 
 ```{r}
 UCD_24_proportion <- UCD24_pop %>%
@@ -518,15 +566,49 @@ UCD_24_proportion <- UCD24_pop %>%
                values_to="proportion")
 ```
 
+#### Visualize proportions
+
 ```{r}
-ggplot(UCD_24_proportion, aes(x=stage, y=proportion, fill=stage)) + 
+UCD_24_proportion %>%
+  filter(!is.na(pop.id)) %>%
+  ggplot(aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
   facet_wrap(~pop.id, ncol = 4) +
-  labs(x="Phenological Stage", y="Proportion") +
+  labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Initiate repro by pop
+
+```{r}
+UCD_24_model <- UCD24_pop%>%
+  filter(!is.na(pop.id)) %>%
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0))
+```
+
+```{r}
+m2 <- glm(initiate_repro ~ pop.id,
+    data= UCD_24_model,
+    family = binomial())
+summary(m1)
+
+m3 <- glm(initiate_repro ~ 1,
+    data= UCD_24_model,
+    family = binomial())
+
+lrtest(m3,m2)
+
+plogis(coef(m2))
+```
+
+```{r}
+m4 <- glmer(initiate_repro ~ (1 | pop.id),
+            data=UCD_24_model,
+            family=binomial)
+summary(m4)
 ```
 
 ### WL2 2023
@@ -603,17 +685,22 @@ ggplot(WL2_pheno, aes(x=death.date, fill=pop)) +
 
 ```{r}
 ggplot(WL2_pheno, aes(x=bud.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Bud")
 
 ggplot(WL2_pheno, aes(x=flower.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Flower")
 
 ggplot(WL2_pheno, aes(x=fruit.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Fruit")
 
 ggplot(WL2_pheno, aes(x=death.date_dfp, fill=pop)) +
   geom_histogram()
 ```
+
+#### Calculate proportion
 
 ```{r}
 WL2_pheno_proportion <- WL2_pheno %>%
@@ -629,6 +716,8 @@ WL2_pheno_proportion <- WL2_pheno %>%
                values_to="proportion")
 ```
 
+#### Visualize proportions
+
 ```{r}
 ggplot(WL2_pheno_proportion, aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
@@ -638,6 +727,20 @@ ggplot(WL2_pheno_proportion, aes(x=stage, y=proportion, fill=stage)) +
   labs(x="Phenological Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+WL2_pheno_proportion %>%
+  filter(pop == "TM2" | pop == "FR") %>%
+  ggplot(aes(x=stage, y=proportion, fill=stage)) + 
+  geom_bar(stat="identity", show.legend=FALSE) +
+  geom_text(aes(label=paste0("Total: ", total_individuals)),
+            position = position_stack(vjust = 1.1), size = 2, color = "black") +
+  facet_wrap(~pop, ncol = 4) +
+  labs(x="Reproductive Stage", y="Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
 ```
 
 ### WL2 2024
@@ -701,19 +804,24 @@ ggplot(WL2_24_pop, aes(x=last.FR.date, fill=pop)) +
 
 ```{r}
 ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Bud")
 
 ggplot(WL2_24_pop, aes(x=flower.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Flower")
 
 ggplot(WL2_24_pop, aes(x=fruit.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Fruit")
 
 ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Last Flower")
 
 ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
-  geom_histogram()
+  geom_histogram() +
+  xlab("Days since planting, Last Fruit")
 
 #ggplot(WL2_24_pop, aes(x=death.date_dfp, fill=pop)) +
   #geom_histogram()
@@ -734,26 +842,61 @@ WL2_24_proportion <- WL2_24_pop %>%
 ```
 
 ```{r}
-#only include populations with non-zero proportion for bud date
-WL2_24_prop_non_zero_bud <- WL2_24_proportion %>%
-  filter(stage == "prop_bud" & proportion > 0) %>%
-  pull(pop)
-
-WL2_24_prop_filter <- WL2_24_proportion %>%
-  filter(pop %in% WL2_24_prop_non_zero_bud)
+#only inlcude parent pops?
+WL2_24_prop_parent <- WL2_24_proportion %>%
+  filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer")
 ```
 
 ```{r}
-ggplot(WL2_24_prop_filter, aes(x=stage, y=proportion, fill=stage)) + 
+#only include populations with non-zero proportion for bud date
+#WL2_24_prop_non_zero_bud <- WL2_24_proportion %>%
+ # filter(stage == "prop_bud" & proportion > 0) %>%
+ # pull(pop)
+
+#WL2_24_prop_filter <- WL2_24_proportion %>%
+  #filter(pop %in% WL2_24_prop_non_zero_bud)
+```
+
+```{r}
+ggplot(WL2_24_prop_parent, aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
-  #geom_text(aes(label=paste0("Total: ", total_individuals)),
-           # position = position_stack(vjust = 1.1), size = 2, color = "black") +
+  geom_text(aes(label=paste0("Total: ", total_individuals)),
+            position = position_stack(vjust = 1.1), size = 2, color = "black") +
   facet_wrap(~pop, ncol = 4) +
-  labs(x="Phenological Stage", y="Proportion") +
+  labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Plot as proportions of plants that were planted
+#### Initiate reproduction by pop
+
+```{r}
+WL2_24_model <- WL2_24_pop %>%
+  filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer") %>%
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0))
+```
+
+```{r}
+m1 <- glm(initiate_repro ~ pop,
+    data=WL2_24_model,
+    family = binomial())
+summary(m1)
+
+m0 <- glm(initiate_repro ~ 1,
+    data=WL2_24_model,
+    family = binomial())
+
+lrtest(m0,m1)
+
+plogis(coef(m1))
+```
+
+```{r}
+m5 <- glmer(initiate_repro ~ (1|pop),
+            data=WL2_24_model,
+            family=binomial)
+
+summary(m5)
+```
 
 Likelihood of flowering given budding
