@@ -92,11 +92,7 @@ print(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" &
 ```{r}
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
   mutate(
-    planting_date = case_when(
-      grepl("^D", block) ~ mdy("11/29/2022"),
-      grepl("^[FHLJ]", block) ~ mdy("11/30/2022"),
-      TRUE ~ NA_Date_
-    )
+    planting_date = mdy("11/27/2022")
   )
 
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
@@ -208,10 +204,7 @@ UCD_pheno_germ$Date_Last_Fruit <- mdy(UCD_pheno_germ$Date_Last_Fruit)
 ```{r}
 UCD_pheno_germ <- UCD_pheno_germ %>%
   mutate(
-    planting_date = case_when(
-      grepl("^[BCEGIKMN]", block) ~ mdy("12/2/2022"),
-      TRUE ~ NA_Date_
-    )
+    planting_date = mdy("11/27/2022")
   )
 
 UCD_pheno_germ <- UCD_pheno_germ %>%
@@ -434,7 +427,10 @@ print(UCD24_pop[UCD24_pop$bed == "D" &
 ```
 
 ```{r}
-#CHECK THIS ONE, LAST FR DATE BEFORE LAST FLOWER DATE!!!!
+#CHECK THIS ONE, LAST FR DATE BEFORE LAST FLOWER DATE!!!! - corrected
+#unique.ID 246
+#Checked pdf and confirmed last FR date should be 05/31/2024
+
 # Directly update the date of the 2014 entry
 UCD24_pop[UCD24_pop$bed == "F" & 
                        UCD24_pop$row == 33 & 
@@ -442,12 +438,13 @@ UCD24_pop[UCD24_pop$bed == "F" &
   update(UCD24_pop[UCD24_pop$bed == "F" & 
                                 UCD24_pop$row == 33 & 
                                 UCD24_pop$col == "C", "last.FR.date"][[1]], 
-         year = 2024)
+         year = 2024, day = 31)
 
 # Verify the updated date
 print(UCD24_pop[UCD24_pop$bed == "F" & 
                              UCD24_pop$row == 33 & 
                              UCD24_pop$col == "C", ])
+
 ```
 
 ```{r}
@@ -593,7 +590,7 @@ UCD_24_model <- UCD24_pop%>%
 m2 <- glm(initiate_repro ~ pop.id,
     data= UCD_24_model,
     family = binomial())
-summary(m1)
+summary(m2)
 
 m3 <- glm(initiate_repro ~ 1,
     data= UCD_24_model,
