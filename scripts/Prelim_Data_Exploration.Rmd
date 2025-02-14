@@ -17,6 +17,7 @@ library(lubridate)
 library(lme4)
 library(googlesheets4)
 library(lmtest)
+library(car)
 ```
 
 ### UCD 2022-2023 Transplants
@@ -92,11 +93,11 @@ print(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" &
 ```{r}
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
   mutate(
-    planting_date = mdy("11/27/2022")
+    planting_date = mdy("11/27/2022") #the date plants were brought to the screenhouse
   )
 
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
-  mutate(across(starts_with("Date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
+  mutate(across(starts_with("Date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dfp"))
 ```
 
 #### Visualize bud, flower, and fruit dates
@@ -126,6 +127,24 @@ ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower_dfp, fill=pop))+
 ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
+```
+
+#### What happened to the plants that initiated reproduction but never finished? - looks to be a mix of death before reaching the next stage (4/10/23, 5/1/23, and 5/8/23 were main death dates) but unsure why there was death (notes do not indicate drought or other event) and just not progressing to the next stage 
+
+##### Add death date
+
+```{r}
+UCD23_May_mort <- read_csv("../input/UCD_2023_Data/Mortality_survey_20230508_corrected.csv")
+
+UCD23_May_mort <- UCD23_May_mort %>%
+  rename(death_date = `death date`)
+```
+
+##### Merge death data into phenology
+
+```{r}
+UCD23_pheno_mort <- UCD_pheno_transplant %>%
+  left_join(select(UCD23_May_mort, block, row, col, death_date, Notes), by=c("block"="block", "row"="row", "col"="col"))
 ```
 
 #### Calculate proportions of total planted for each reproductive stage by pop
@@ -580,14 +599,25 @@ UCD_24_proportion %>%
 
 #### Initiate repro by pop
 
+#### Add climate distance data
+
 ```{r}
-UCD_24_model <- UCD24_pop%>%
-  filter(!is.na(pop.id)) %>%
-  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0))
+clim_dist_UCD <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
 ```
 
 ```{r}
-m2 <- glm(initiate_repro ~ pop.id,
+#change pop column of clim_dist_UCD to match UCD24_pop
+colnames(clim_dist_UCD)[colnames(clim_dist_UCD) == "parent.pop"] <- "pop.id"
+                                 
+#join clim_dist_UCD to phenology tibble and add binary for initiating reproduction
+UCD_24_model <- UCD24_pop%>%
+  filter(!is.na(pop.id)) %>%
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
+  left_join(clim_dist_UCD, by="pop.id")
+```
+
+```{r}
+m2 <- glm(initiate_repro ~ 0 + pop.id,
     data= UCD_24_model,
     family = binomial())
 summary(m2)
@@ -602,10 +632,20 @@ plogis(coef(m2))
 ```
 
 ```{r}
-m4 <- glmer(initiate_repro ~ (1 | pop.id),
+#climate distance as a fixed effect and pop as a random
+m4 <- glmer(initiate_repro ~ Gowers_Dist + (1 | pop.id),
             data=UCD_24_model,
             family=binomial)
 summary(m4)
+
+Anova(m4)
+```
+
+```{r}
+m10 <- glmer(initiate_repro ~ (1 | pop.id),
+             data=UCD_24_model,
+             family=binomial)
+summary(m10)
 ```
 
 ### WL2 2023
@@ -868,9 +908,14 @@ ggplot(WL2_24_prop_parent, aes(x=stage, y=proportion, fill=stage)) +
 #### Initiate reproduction by pop
 
 ```{r}
+clim_dist_WL2 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
+
+colnames(clim_dist_WL2)[colnames(clim_dist_WL2) == "parent.pop"] <- "pop.id"
+
 WL2_24_model <- WL2_24_pop %>%
   filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer") %>%
-  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0))
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
+  left_join(clim_dist_UCD, by="pop")
 ```
 
 ```{r}
@@ -897,3 +942,7 @@ summary(m5)
 ```
 
 Likelihood of flowering given budding
+
+Reaction Norm: days to flowering at high and low elevation
+
+Are there differences in flowering timing plasticity between populations
