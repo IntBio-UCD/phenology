@@ -47,20 +47,6 @@ UCD_pheno_transplant$Date_Last_Flower <- mdy(UCD_pheno_transplant$Date_Last_Flow
 UCD_pheno_transplant$Date_Last_Fruit <- mdy(UCD_pheno_transplant$Date_Last_Fruit) #no last fruit dates
 ```
 
-#### Filter to only include individuals that budded - don't know if I should use this
-
-```{r}
-
-#UCD_pheno_trans_filter <- UCD_pheno_transplant[!is.na(UCD_pheno_transplant$Date_First_Bud) | !is.na(UCD_pheno_transplant$Date_First_Flower), ]
-```
-
-#### Visualize bud date - the year for one individual is wrong
-
-```{r}
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud)) +
-  geom_histogram()
-```
-
 ##### Identify which row has the wrong year
 
 ```{r}
@@ -98,19 +84,8 @@ UCD_pheno_transplant <- UCD_pheno_transplant %>%
 
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
   mutate(across(starts_with("Date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dfp"))
-```
 
-#### Visualize bud, flower, and fruit dates
-
-```{r}
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud, fill=pop)) +
-  geom_histogram()
-
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower, fill=pop))+
-  geom_histogram()
-
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit, fill=pop)) +
-  geom_histogram()
+write.csv(UCD_pheno_transplant, "../input/UCD22_23_transplant.csv", row.names = FALSE)
 ```
 
 #### Visualize as bud/flower/fruit day from planting
@@ -129,7 +104,7 @@ ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit_dfp, fill=pop)) +
   xlab("Days since planting, Fruit")
 ```
 
-#### What happened to the plants that initiated reproduction but never finished? - looks to be a mix of death before reaching the next stage (4/10/23, 5/1/23, and 5/8/23 were main death dates) but unsure why there was death (notes do not indicate drought or other event) and just not progressing to the next stage 
+#### What happened to the plants that initiated reproduction but never finished? - looks to be a mix of death before reaching the next stage (4/10/23, 5/1/23, and 5/8/23 were main death dates) but unsure why there was death (notes do not indicate drought or other event) and just not progressing to the next stage
 
 ##### Add death date
 
@@ -162,6 +137,8 @@ UCD_trans_prop <- UCD_pheno_transplant %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
                values_to="proportion")
+
+write.csv(UCD_trans_prop, "../input/UCD22_23_transplant_prop.csv", row.names = FALSE)
 ```
 
 #### Only include populations with non-zero proportion for bud date
@@ -186,12 +163,6 @@ ggplot(UCD_trans_prop_filter, aes(x=stage, y=proportion, fill=stage)) +
   labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-```{r}
-#m1 <- glmer(Date_First_Bud ~ 1 + (1|pop),
-           # family=gaussian,
-           # data=UCD_pheno_transplant)
 ```
 
 ### UCD 2022-2023 Germinants
@@ -228,19 +199,8 @@ UCD_pheno_germ <- UCD_pheno_germ %>%
 
 UCD_pheno_germ <- UCD_pheno_germ %>%
   mutate(across(starts_with("Date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
-```
 
-#### Visualize bud, flower, and fruit dates
-
-```{r}
-ggplot(UCD_pheno_germ, aes(x=Date_First_Bud, fill=pop)) +
-  geom_histogram()
-
-ggplot(UCD_pheno_germ, aes(x=Date_First_Flower, fill=pop)) +
-  geom_histogram()
-
-ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit, fill=pop)) +
-  geom_histogram()
+write.csv(UCD_pheno_germ, "../input/UCD22_23_germ.csv", row.names=FALSE)
 ```
 
 #### Visualize as bud/flower/fruit day from planting
@@ -273,6 +233,8 @@ UCD_germ_prop <- UCD_pheno_germ %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
                values_to="proportion")
+
+write.csv(UCD_germ_prop, "../input/UCD22_23_germ_prop.csv", row.names = FALSE)
 ```
 
 #### Visualize proportions
@@ -482,49 +444,30 @@ print(UCD24_pop[UCD24_pop$bed == "C" &
                              UCD24_pop$col == "C", ])
 ```
 
+##### Check for cases when flower date is NA but there is a fruit date- found 1 and updated flowering date to be fruit date based on notes on datasheet
+
+```{r}
+# Find individuals with a fruit date but no flower date 
+UCD24_fruit_no_flower <- UCD24_pop[!is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date), ]  
+
+# Display the result for this condition 
+print(UCD24_fruit_no_flower)   
+
+#Add flowering date (4/26/2024) that is the same as the fruit date 
+UCD24_pop$flower.date[UCD24_pop$pop.id == "TM2" & !is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date)] <- "2024-04-26"
+```
+
 #### Change date to days since planting
 
 ```{r}
-planting_date <- mdy("12/04/2023")
+UCD23_24_planting_date <- mdy("12/04/2023")
 
 UCD24_pop <- UCD24_pop %>%
   mutate(across(ends_with(".date") & !matches("census.date"),
-                ~ as.integer(ymd(.) - planting_date),
+                ~ as.integer(ymd(.) - UCD23_24_planting_date),
                 .names="{.col}_dfp"))
-```
 
-#### Visualize with date of stage
-
-```{r}
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=bud.date, fill=pop.id)) +
-  geom_histogram()
-
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=flower.date, fill=pop.id)) +
-  geom_histogram()
-
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=fruit.date, fill=pop.id)) +
-  geom_histogram()
-
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=last.FL.date, fill=pop.id)) +
-  geom_histogram()
-
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=last.FR.date, fill=pop.id)) +
-  geom_histogram()
-
-UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=death.date, fill=pop.id)) +
-  geom_histogram()
+write.csv(UCD24_pop, "../input/UCD23_24.csv", row.names=FALSE)
 ```
 
 #### Visualize with day since planting
@@ -579,7 +522,11 @@ UCD_24_proportion <- UCD24_pop %>%
   ) %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
-               values_to="proportion")
+               values_to="proportion") %>%
+  filter(!is.na(pop.id)) %>%
+  ungroup()
+
+write.csv(UCD_24_proportion, "../input/UCD23_24_prop.csv", row.names = FALSE)
 ```
 
 #### Visualize proportions
@@ -595,6 +542,24 @@ UCD_24_proportion %>%
   labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Searching for any flowering props that are lower than fruiting props
+
+```{r}
+# Filter data for 'prop_flower' and 'prop_fruit' stages 
+flower_data <- UCD_24_proportion[UCD_24_proportion$stage == "prop_flower", ] 
+fruit_data <- UCD_24_proportion[UCD_24_proportion$stage == "prop_fruit", ]  
+
+# Merge the data on 'pop.id' 
+merged_data <- merge(flower_data, fruit_data, by = "pop.id", suffixes = c("_flower", "_fruit"))  
+
+# Check where 'prop_flower' is smaller than 'prop_fruit' 
+
+result <- merged_data[merged_data$proportion_flower < merged_data$proportion_fruit, ]  
+
+# Display the result 
+print(result[, c("pop.id", "proportion_flower", "proportion_fruit")]) 
 ```
 
 #### Initiate repro by pop
@@ -666,12 +631,6 @@ WL2_pheno$last.fruit.date <- mdy(WL2_pheno$last.fruit.date)
 WL2_pheno$death.date <- mdy(WL2_pheno$death.date)
 ```
 
-#### Filter to only include individuals that budded - don't think I want this
-
-```{r}
-#WL2_pheno_filter <- WL2_pheno[!is.na(WL2_pheno$bud.date),]
-```
-
 #### One individual has the wrong fruit date year, correct to say 2023
 
 ```{r}
@@ -695,30 +654,18 @@ print(WL2_pheno[WL2_pheno$block == "A" &
 
 ```{r}
 #THIS PLANTING IS HARDER TO ASSIGN A PLANTING DAY SINCE IT IS DONE BY BLOCK
-#For now I will call the planting date the day when all the plants were in
+#For now I will call the planting date the day when all the plants were in field conditions
 WL2_23_planting_date <- mdy("07/19/2023")
 
 WL2_pheno <- WL2_pheno %>%
   mutate(across(ends_with(".date"),
-                ~ as.integer(ymd(.) - planting_date),
+                ~ as.integer(ymd(.) - WL2_23_planting_date),
                 .names="{.col}_dfp"))
+
+write.csv(WL2_pheno, "../input/WL2_23.csv", row.names = FALSE)
 ```
 
-#### Visualize bud, flower, and fruit dates
-
-```{r}
-ggplot(WL2_pheno, aes(x=bud.date, fill=pop)) +
-  geom_histogram()
-
-ggplot(WL2_pheno, aes(x=flower.date, fill=pop)) +
-  geom_histogram()
-
-ggplot(WL2_pheno, aes(x=fruit.date, fill=pop)) +
-  geom_histogram()
-
-ggplot(WL2_pheno, aes(x=death.date, fill=pop)) +
-  geom_histogram()
-```
+#### Visualize stage from planting date
 
 ```{r}
 ggplot(WL2_pheno, aes(x=bud.date_dfp, fill=pop)) +
@@ -751,6 +698,8 @@ WL2_pheno_proportion <- WL2_pheno %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
                values_to="proportion")
+
+write.csv(WL2_pheno_proportion, "../input/WL2_23_prop.csv", row.names = FALSE)
 ```
 
 #### Visualize proportions
@@ -787,8 +736,9 @@ WL2_24 <- read_csv("../input/WL2_2024_Data/WL2_mort_pheno_20241023_corrected.csv
 
 ```
 
+#### Apply lubridate
+
 ```{r}
-#apply lubridate
 WL2_24$bud.date <- mdy(WL2_24$bud.date)
 WL2_24$flower.date <- mdy(WL2_24$flower.date)
 WL2_24$fruit.date <- mdy(WL2_24$fruit.date)
@@ -798,16 +748,15 @@ WL2_24$death.date <- mdy(WL2_24$death.date)
 WL2_24$missing.date <- mdy(WL2_24$missing.date)
 ```
 
+#### Adding pop info for only 2nd year parent pop plants
+
 ```{r}
-#creating column with only pop info
 WL2_24_pop <- WL2_24 %>%
   mutate(pop = case_when(
     grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^(\\w+)_\\d+_\\d+$", "\\1", unique.ID),
     TRUE ~ unique.ID
   ))
-```
 
-```{r}
 WL2_24_pop <- WL2_24_pop %>%
   mutate(
     planting_date = if_else(is.na(block), WL2_23_planting_date, NA_Date_)
@@ -819,27 +768,53 @@ WL2_24_pop <- WL2_24_pop %>%
   ))
 ```
 
+#### Finding plants with a flower date and NA bud date/fruit date and NA flower date
+
 ```{r}
-ggplot(WL2_24_pop, aes(x=bud.date, fill=pop)) +
-  geom_histogram()
+#finding plants that have a fruit date but no flower date
+WL2_fruit_no_flower <- WL2_24_pop[!is.na(WL2_24_pop$fruit.date) & is.na(WL2_24_pop$flower.date), ]
 
-ggplot(WL2_24_pop, aes(x=flower.date, fill=pop)) +
-  geom_histogram()
+# View the rows
+print(WL2_fruit_no_flower)
 
-ggplot(WL2_24_pop, aes(x=fruit.date, fill=pop)) +
-  geom_histogram()
+#updating the flower date to be the same as the fruit date after confirming notes in datascans
+WL2_24_pop$flower.date[is.na(WL2_24_pop$flower.date) & !is.na(WL2_24_pop$fruit.date)] <- WL2_24_pop$fruit.date[is.na(WL2_24_pop$flower.date) & !is.na(WL2_24_pop$fruit.date)]
 
-ggplot(WL2_24_pop, aes(x=last.FL.date, fill=pop)) +
-  geom_histogram()
+# Verify the update
+print(WL2_24_pop[is.na(WL2_24_pop$flower.date) & !is.na(WL2_24_pop$fruit.date), ])
 
-ggplot(WL2_24_pop, aes(x=last.FR.date, fill=pop)) +
-  geom_histogram()
 
-#ggplot(WL2_24_pop, aes(x=death.date, fill=pop)) +
-  #geom_histogram()
+#finding plants that have a flower date but no bud date
+WL2_flower_no_bud <- WL2_24_pop[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date), ]
+
+# View the rows
+print(WL2_flower_no_bud)
+
+#updating budding date to be the same as flowering date for all but WL2_8_4 in bed B, row 26, col A after reviewing the notes from the datascan
+# Identify rows with a flower date but an NA for bud date
+rows_to_update <- WL2_24_pop[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date), ]
+
+# Update the bud_date to be the same as flower_date for these rows, except the specific row (bed == "F", row == 26, col == "A")
+WL2_24_pop$bud.date[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date) & 
+                             !(WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$col == "A")] <- 
+                             WL2_24_pop$flower.date[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date) & 
+                             !(WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$col == "A")]
+
+# For the specific row where bed == "F", row == 26, and col == "A", set bud_date to be 7 days before flower_date
+WL2_24_pop$bud.date[WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$col == "A"] <- 
+  as.Date(WL2_24_pop$flower.date[WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$col == "A"]) - 7
+
+# Verify the update
+print(WL2_24_pop[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date), ])
 ```
 
+#### NEED TO ALSO MAKE SURE TO CHECK IF THERE IS A LAST FRUIT WITHOUT LAST FLOWER
+
+#### Visualize days since planting
+
 ```{r}
+write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
+
 ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
@@ -859,10 +834,9 @@ ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
 ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Fruit")
-
-#ggplot(WL2_24_pop, aes(x=death.date_dfp, fill=pop)) +
-  #geom_histogram()
 ```
+
+#### Calculate proportion
 
 ```{r}
 WL2_24_proportion <- WL2_24_pop %>%
@@ -882,6 +856,8 @@ WL2_24_proportion <- WL2_24_pop %>%
 #only inlcude parent pops?
 WL2_24_prop_parent <- WL2_24_proportion %>%
   filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer")
+
+write.csv(WL2_24_prop_parent, "../input/WL2_24_prop.csv", row.names = FALSE)
 ```
 
 ```{r}
@@ -903,6 +879,26 @@ ggplot(WL2_24_prop_parent, aes(x=stage, y=proportion, fill=stage)) +
   labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Filter data for 'prop_flower' and 'prop_fruit' stages 
+bud_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_bud", ]
+flower_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_flower", ] 
+fruit_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_fruit", ]  
+
+# Merge the data on 'pop.id' 
+merged_data2 <- merge(flower_data2, fruit_data2, by = "pop", suffixes = c("_flower", "_fruit"))  
+merged_data3 <- merge(merged_data2, bud_data2, by="pop")
+
+# Check where 'prop_flower' is smaller than 'prop_fruit' 
+
+result2 <- merged_data2[merged_data2$proportion_flower < merged_data2$proportion_fruit, ]  
+result3 <- merged_data3[merged_data3$proportion < merged_data3$proportion_flower,]
+
+# Display the result 
+print(result2[, c("pop", "proportion_flower", "proportion_fruit")]) 
+print(result3[, c("pop", "proportion", "proportion_flower")])
 ```
 
 #### Initiate reproduction by pop
@@ -946,3 +942,5 @@ Likelihood of flowering given budding
 Reaction Norm: days to flowering at high and low elevation
 
 Are there differences in flowering timing plasticity between populations
+
+What are the fates of WL2 plants that survived to year 2 but did not reproduce? stacked bar plot with year 2 fate
