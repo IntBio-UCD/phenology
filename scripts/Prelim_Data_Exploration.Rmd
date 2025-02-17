@@ -144,18 +144,18 @@ write.csv(UCD_trans_prop, "../input/UCD22_23_transplant_prop.csv", row.names = F
 #### Only include populations with non-zero proportion for bud date
 
 ```{r}
-UCD_trans_prop_non_zero_bud <- UCD_trans_prop %>%
-  filter(stage == "prop_bud" & proportion > 0) %>%
-  pull(pop)
+#UCD_trans_prop_non_zero_bud <- UCD_trans_prop %>%
+  #filter(stage == "prop_bud" & proportion > 0) %>%
+ # pull(pop)
 
-UCD_trans_prop_filter <- UCD_trans_prop %>%
-  filter(pop %in% UCD_trans_prop_non_zero_bud)
+#UCD_trans_prop_filter <- UCD_trans_prop %>%
+  #filter(pop %in% UCD_trans_prop_non_zero_bud)
 ```
 
 #### Visualize proportions
 
 ```{r}
-ggplot(UCD_trans_prop_filter, aes(x=stage, y=proportion, fill=stage)) + 
+ggplot(UCD_trans_prop, aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
@@ -444,19 +444,6 @@ print(UCD24_pop[UCD24_pop$bed == "C" &
                              UCD24_pop$col == "C", ])
 ```
 
-##### Check for cases when flower date is NA but there is a fruit date- found 1 and updated flowering date to be fruit date based on notes on datasheet
-
-```{r}
-# Find individuals with a fruit date but no flower date 
-UCD24_fruit_no_flower <- UCD24_pop[!is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date), ]  
-
-# Display the result for this condition 
-print(UCD24_fruit_no_flower)   
-
-#Add flowering date (4/26/2024) that is the same as the fruit date 
-UCD24_pop$flower.date[UCD24_pop$pop.id == "TM2" & !is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date)] <- "2024-04-26"
-```
-
 #### Change date to days since planting
 
 ```{r}
@@ -511,6 +498,30 @@ UCD24_pop %>%
 
 #### Calculate proportions
 
+##### Check for cases when flower date is NA but there is a fruit date- found 1 and updated flowering date to be fruit date based on notes on datasheet
+
+```{r}
+# Find individuals with a fruit date but no flower date 
+UCD24_fruit_no_flower <- UCD24_pop[!is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date), ]  
+
+# Display the result for this condition 
+print(UCD24_fruit_no_flower)   
+
+#Add flowering date (4/26/2024) that is the same as the fruit date 
+UCD24_pop$flower.date[UCD24_pop$pop.id == "TM2" & !is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date)] <- "2024-04-26"
+
+```
+
+##### Check for last fruit date but no fruit date
+
+```{r}
+UCD24_lastfr_no_fruit <- UCD24_pop[!is.na(UCD24_pop$last.FR.date) & is.na(UCD24_pop$fruit.date), ] 
+print(UCD24_lastfr_no_fruit) 
+
+#only one is parent pop - will use last fruit date as fruit date since no notes on datascan
+UCD24_pop$fruit.date[UCD24_pop$pop.id == "WL2" & !is.na(UCD24_pop$last.FR.date) & is.na(UCD24_pop$fruit.date)] <- "2024-06-07"
+```
+
 ```{r}
 UCD_24_proportion <- UCD24_pop %>%
   group_by(pop.id) %>%
@@ -538,7 +549,7 @@ UCD_24_proportion %>%
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
-  facet_wrap(~pop.id, ncol = 4) +
+  facet_wrap(~pop.id, ncol = 4, scales= "free") +
   labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -622,7 +633,6 @@ WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.
 #### Apply lubridate
 
 ```{r}
-#apply lubridate
 WL2_pheno$bud.date <- mdy(WL2_pheno$bud.date)
 WL2_pheno$flower.date <- mdy(WL2_pheno$flower.date)
 WL2_pheno$fruit.date <- mdy(WL2_pheno$fruit.date)
@@ -768,7 +778,35 @@ WL2_24_pop <- WL2_24_pop %>%
   ))
 ```
 
-#### Finding plants with a flower date and NA bud date/fruit date and NA flower date
+#### Visualize days since planting
+
+```{r}
+write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
+
+ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
+  geom_histogram() +
+  xlab("Days since planting, Bud")
+
+ggplot(WL2_24_pop, aes(x=flower.date_dfp, fill=pop)) +
+  geom_histogram() +
+  xlab("Days since planting, Flower")
+
+ggplot(WL2_24_pop, aes(x=fruit.date_dfp, fill=pop)) +
+  geom_histogram() +
+  xlab("Days since planting, Fruit")
+
+ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
+  geom_histogram() +
+  xlab("Days since planting, Last Flower")
+
+ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
+  geom_histogram() +
+  xlab("Days since planting, Last Fruit")
+```
+
+#### Calculate proportion
+
+##### Finding plants with a flower date and NA bud date/fruit date and NA flower date
 
 ```{r}
 #finding plants that have a fruit date but no flower date
@@ -808,35 +846,7 @@ WL2_24_pop$bud.date[WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$co
 print(WL2_24_pop[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date), ])
 ```
 
-#### NEED TO ALSO MAKE SURE TO CHECK IF THERE IS A LAST FRUIT WITHOUT LAST FLOWER
-
-#### Visualize days since planting
-
-```{r}
-write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
-
-ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
-  geom_histogram() +
-  xlab("Days since planting, Bud")
-
-ggplot(WL2_24_pop, aes(x=flower.date_dfp, fill=pop)) +
-  geom_histogram() +
-  xlab("Days since planting, Flower")
-
-ggplot(WL2_24_pop, aes(x=fruit.date_dfp, fill=pop)) +
-  geom_histogram() +
-  xlab("Days since planting, Fruit")
-
-ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
-  geom_histogram() +
-  xlab("Days since planting, Last Flower")
-
-ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
-  geom_histogram() +
-  xlab("Days since planting, Last Fruit")
-```
-
-#### Calculate proportion
+##### NEED TO ALSO MAKE SURE TO CHECK IF THERE IS A LAST FRUIT WITHOUT LAST FLOWER
 
 ```{r}
 WL2_24_proportion <- WL2_24_pop %>%
@@ -871,7 +881,9 @@ write.csv(WL2_24_prop_parent, "../input/WL2_24_prop.csv", row.names = FALSE)
 ```
 
 ```{r}
-ggplot(WL2_24_prop_parent, aes(x=stage, y=proportion, fill=stage)) + 
+WL2_24_prop_parent %>%
+  filter(total_individuals > 1) %>%
+  ggplot(aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
@@ -880,6 +892,8 @@ ggplot(WL2_24_prop_parent, aes(x=stage, y=proportion, fill=stage)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+#### Searching for stage proportions that are greater than the previous stage proportion
 
 ```{r}
 # Filter data for 'prop_flower' and 'prop_fruit' stages 
@@ -896,7 +910,6 @@ merged_data3 <- merge(merged_data2, bud_data2, by="pop")
 result2 <- merged_data2[merged_data2$proportion_flower < merged_data2$proportion_fruit, ]  
 result3 <- merged_data3[merged_data3$proportion < merged_data3$proportion_flower,]
 
-# Display the result 
 print(result2[, c("pop", "proportion_flower", "proportion_fruit")]) 
 print(result3[, c("pop", "proportion", "proportion_flower")])
 ```
