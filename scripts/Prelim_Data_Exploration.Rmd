@@ -26,32 +26,32 @@ library(car)
 UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/Phenology_survey_transplants_20230508_corrected.csv")
 ```
 
-#### Renaming columns to remove spaces between words
+#### Renaming columns to remove spaces between words and change column name to match other gardens
 
 ```{r}
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Bud"] <- "Date_First_Bud"
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Fruit"] <- "Date_First_Fruit"
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Flower"] <- "Date_First_Flower"
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Flower"] <- "Date_Last_Flower"
-colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Fruit"] <- "Date_Last_Fruit"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Bud"] <- "bud.date"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Fruit"] <- "fruit.date"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Flower"] <- "flower.date"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Flower"] <- "last.FR.date"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Fruit"] <- "last.FL.date"
 
 ```
 
 #### Apply lubridate
 
 ```{r}
-UCD_pheno_transplant$Date_First_Bud <- mdy(UCD_pheno_transplant$Date_First_Bud)
-UCD_pheno_transplant$Date_First_Flower <- mdy(UCD_pheno_transplant$Date_First_Flower)
-UCD_pheno_transplant$Date_First_Fruit <- mdy(UCD_pheno_transplant$Date_First_Fruit)
-UCD_pheno_transplant$Date_Last_Flower <- mdy(UCD_pheno_transplant$Date_Last_Flower) #no last flower dates
-UCD_pheno_transplant$Date_Last_Fruit <- mdy(UCD_pheno_transplant$Date_Last_Fruit) #no last fruit dates
+UCD_pheno_transplant$bud.date <- mdy(UCD_pheno_transplant$bud.date)
+UCD_pheno_transplant$flower.date <- mdy(UCD_pheno_transplant$flower.date)
+UCD_pheno_transplant$fruit.date <- mdy(UCD_pheno_transplant$fruit.date)
+UCD_pheno_transplant$last.FL.date <- mdy(UCD_pheno_transplant$last.FL.date) #no last flower dates
+UCD_pheno_transplant$last.FR.date <- mdy(UCD_pheno_transplant$last.FR.date) #no last fruit dates
 ```
 
 ##### Identify which row has the wrong year
 
 ```{r}
 # one first bud date seems to be 2022 which is not correct
-bud2022 <- UCD_pheno_transplant[year(UCD_pheno_transplant$Date_First_Bud) == 2022,]
+bud2022 <- UCD_pheno_transplant[year(UCD_pheno_transplant$bud.date) == 2022,]
 print(bud2022)
 ```
 
@@ -61,10 +61,10 @@ print(bud2022)
 # Directly update the date of the 2022 entry
 UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
                        UCD_pheno_transplant$row == 4 & 
-                       UCD_pheno_transplant$col == "A", "Date_First_Bud"] <- 
+                       UCD_pheno_transplant$col == "A", "bud.date"] <- 
   update(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
                                 UCD_pheno_transplant$row == 4 & 
-                                UCD_pheno_transplant$col == "A", "Date_First_Bud"][[1]], 
+                                UCD_pheno_transplant$col == "A", "bud.date"][[1]], 
          year = 2023)
 
 # Verify the updated date
@@ -83,7 +83,7 @@ UCD_pheno_transplant <- UCD_pheno_transplant %>%
   )
 
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
-  mutate(across(starts_with("Date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dfp"))
+  mutate(across(ends_with(".date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dfp"))
 
 write.csv(UCD_pheno_transplant, "../input/UCD22_23_transplant.csv", row.names = FALSE)
 ```
@@ -91,15 +91,15 @@ write.csv(UCD_pheno_transplant, "../input/UCD22_23_transplant.csv", row.names = 
 #### Visualize as bud/flower/fruit day from planting
 
 ```{r}
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Bud_dfp, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=bud.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Flower_dfp, fill=pop))+
+ggplot(UCD_pheno_transplant, aes(x=flower.date_dfp, fill=pop))+
   geom_histogram() +
   xlab("Days since planting, Flower")
 
-ggplot(UCD_pheno_transplant, aes(x=Date_First_Fruit_dfp, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=fruit.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 ```
@@ -130,9 +130,9 @@ UCD_trans_prop <- UCD_pheno_transplant %>%
   group_by(pop) %>%
   summarise(
     total_individuals = n(),
-    prop_bud = sum(!is.na(Date_First_Bud))/total_individuals,
-    prop_flower = sum(!is.na(Date_First_Flower))/total_individuals,
-    prop_fruit = sum(!is.na(Date_First_Fruit))/total_individuals
+    prop_bud = sum(!is.na(bud.date))/total_individuals,
+    prop_flower = sum(!is.na(flower.date))/total_individuals,
+    prop_fruit = sum(!is.na(fruit.date))/total_individuals
   ) %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
@@ -175,18 +175,18 @@ UCD_pheno_germ <- read_csv("../input/UCD_2023_Data/Phenology_survey_germination_
 
 ```{r}
 #Update column names
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Bud"] <- "Date_First_Bud"
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Fruit"] <- "Date_First_Fruit"
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Flower"] <- "Date_First_Flower"
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Flower"] <- "Date_Last_Flower"
-colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Fruit"] <- "Date_Last_Fruit"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Bud"] <- "bud.date"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Fruit"] <- "fruit.date"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date First Flower"] <- "flower.date"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Flower"] <- "last.FL.date"
+colnames(UCD_pheno_germ)[colnames(UCD_pheno_germ) == "Date Last Fruit"] <- "last.FR.date"
 
 #apply lubridate
-UCD_pheno_germ$Date_First_Bud <- mdy(UCD_pheno_germ$Date_First_Bud)
-UCD_pheno_germ$Date_First_Flower <- mdy(UCD_pheno_germ$Date_First_Flower)
-UCD_pheno_germ$Date_First_Fruit <- mdy(UCD_pheno_germ$Date_First_Fruit)
-UCD_pheno_germ$Date_Last_Flower <- mdy(UCD_pheno_germ$Date_Last_Flower) #no last flower dates
-UCD_pheno_germ$Date_Last_Fruit <- mdy(UCD_pheno_germ$Date_Last_Fruit)
+UCD_pheno_germ$bud.date <- mdy(UCD_pheno_germ$bud.date)
+UCD_pheno_germ$flower.date <- mdy(UCD_pheno_germ$flower.date)
+UCD_pheno_germ$fruit.date <- mdy(UCD_pheno_germ$fruit.date)
+UCD_pheno_germ$last.FL.date <- mdy(UCD_pheno_germ$last.FL.date) #no last flower dates
+UCD_pheno_germ$last.FR.date <- mdy(UCD_pheno_germ$last.FR.date)
 ```
 
 #### Change date to days since planting
@@ -198,7 +198,7 @@ UCD_pheno_germ <- UCD_pheno_germ %>%
   )
 
 UCD_pheno_germ <- UCD_pheno_germ %>%
-  mutate(across(starts_with("Date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
+  mutate(across(ends_with(".date"), ~ as.integer(. - planting_date), .names="{.col}_dfp"))
 
 write.csv(UCD_pheno_germ, "../input/UCD22_23_germ.csv", row.names=FALSE)
 ```
@@ -206,15 +206,15 @@ write.csv(UCD_pheno_germ, "../input/UCD22_23_germ.csv", row.names=FALSE)
 #### Visualize as bud/flower/fruit day from planting
 
 ```{r}
-ggplot(UCD_pheno_germ, aes(x=Date_First_Bud_dfp, fill=pop)) +
+ggplot(UCD_pheno_germ, aes(x=bud.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
-ggplot(UCD_pheno_germ, aes(x=Date_First_Flower_dfp, fill=pop)) +
+ggplot(UCD_pheno_germ, aes(x=flower.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Flower")
 
-ggplot(UCD_pheno_germ, aes(x=Date_First_Fruit_dfp, fill=pop)) +
+ggplot(UCD_pheno_germ, aes(x=fruit.date_dfp, fill=pop)) +
   geom_histogram() +
    xlab("Days since planting, Fruit")
 ```
@@ -226,9 +226,9 @@ UCD_germ_prop <- UCD_pheno_germ %>%
   group_by(pop) %>%
   summarise(
     total_individuals = n(),
-    prop_bud = sum(!is.na(Date_First_Bud))/total_individuals,
-    prop_flower = sum(!is.na(Date_First_Flower))/total_individuals,
-    prop_fruit = sum(!is.na(Date_First_Fruit))/total_individuals
+    prop_bud = sum(!is.na(bud.date))/total_individuals,
+    prop_flower = sum(!is.na(flower.date))/total_individuals,
+    prop_fruit = sum(!is.na(fruit.date))/total_individuals
   ) %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
@@ -286,6 +286,8 @@ UCD24_pop <- UCD24 %>%
       mutate(unique.ID = as.character(unique.ID)),  # Convert unique.ID to character
     by = "unique.ID"
   )
+
+colnames(UCD24_pop)[colnames(UCD24_pop) == "pop.id"] <- "pop"
 ```
 
 #### Apply lubridate
@@ -461,38 +463,38 @@ write.csv(UCD24_pop, "../input/UCD23_24.csv", row.names=FALSE)
 
 ```{r}
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=bud.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=bud.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=flower.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=flower.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Flower")
 
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=fruit.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=fruit.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=last.FL.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=last.FL.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Flower")
 
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=last.FR.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=last.FR.date_dfp, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Fruit")
 
 UCD24_pop %>%
-  filter(!is.na(pop.id)) %>%
-  ggplot(aes(x=death.date_dfp, fill=pop.id)) +
+  filter(!is.na(pop)) %>%
+  ggplot(aes(x=death.date_dfp, fill=pop)) +
   geom_histogram()
 ```
 
@@ -508,7 +510,7 @@ UCD24_fruit_no_flower <- UCD24_pop[!is.na(UCD24_pop$fruit.date) & is.na(UCD24_po
 print(UCD24_fruit_no_flower)   
 
 #Add flowering date (4/26/2024) that is the same as the fruit date 
-UCD24_pop$flower.date[UCD24_pop$pop.id == "TM2" & !is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date)] <- "2024-04-26"
+UCD24_pop$flower.date[UCD24_pop$pop == "TM2" & !is.na(UCD24_pop$fruit.date) & is.na(UCD24_pop$flower.date)] <- "2024-04-26"
 
 ```
 
@@ -519,12 +521,12 @@ UCD24_lastfr_no_fruit <- UCD24_pop[!is.na(UCD24_pop$last.FR.date) & is.na(UCD24_
 print(UCD24_lastfr_no_fruit) 
 
 #only one is parent pop - will use last fruit date as fruit date since no notes on datascan
-UCD24_pop$fruit.date[UCD24_pop$pop.id == "WL2" & !is.na(UCD24_pop$last.FR.date) & is.na(UCD24_pop$fruit.date)] <- "2024-06-07"
+UCD24_pop$fruit.date[UCD24_pop$pop == "WL2" & !is.na(UCD24_pop$last.FR.date) & is.na(UCD24_pop$fruit.date)] <- "2024-06-07"
 ```
 
 ```{r}
 UCD_24_proportion <- UCD24_pop %>%
-  group_by(pop.id) %>%
+  group_by(pop) %>%
   summarise(
     total_individuals = n(),
     prop_bud = sum(!is.na(bud.date))/total_individuals,
@@ -534,7 +536,7 @@ UCD_24_proportion <- UCD24_pop %>%
   pivot_longer(cols=starts_with("prop"),
                names_to="stage",
                values_to="proportion") %>%
-  filter(!is.na(pop.id)) %>%
+  filter(!is.na(pop)) %>%
   ungroup()
 
 write.csv(UCD_24_proportion, "../input/UCD23_24_prop.csv", row.names = FALSE)
@@ -544,12 +546,12 @@ write.csv(UCD_24_proportion, "../input/UCD23_24_prop.csv", row.names = FALSE)
 
 ```{r}
 UCD_24_proportion %>%
-  filter(!is.na(pop.id)) %>%
+  filter(!is.na(pop)) %>%
   ggplot(aes(x=stage, y=proportion, fill=stage)) + 
   geom_bar(stat="identity", show.legend=FALSE) +
   geom_text(aes(label=paste0("Total: ", total_individuals)),
             position = position_stack(vjust = 1.1), size = 2, color = "black") +
-  facet_wrap(~pop.id, ncol = 4, scales= "free") +
+  facet_wrap(~pop, ncol = 4, scales= "free") +
   labs(x="Reproductive Stage", y="Proportion") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -562,15 +564,15 @@ UCD_24_proportion %>%
 flower_data <- UCD_24_proportion[UCD_24_proportion$stage == "prop_flower", ] 
 fruit_data <- UCD_24_proportion[UCD_24_proportion$stage == "prop_fruit", ]  
 
-# Merge the data on 'pop.id' 
-merged_data <- merge(flower_data, fruit_data, by = "pop.id", suffixes = c("_flower", "_fruit"))  
+# Merge the data on 'pop' 
+merged_data <- merge(flower_data, fruit_data, by = "pop", suffixes = c("_flower", "_fruit"))  
 
 # Check where 'prop_flower' is smaller than 'prop_fruit' 
 
 result <- merged_data[merged_data$proportion_flower < merged_data$proportion_fruit, ]  
 
 # Display the result 
-print(result[, c("pop.id", "proportion_flower", "proportion_fruit")]) 
+print(result[, c("pop", "proportion_flower", "proportion_fruit")]) 
 ```
 
 #### Initiate repro by pop
@@ -583,17 +585,17 @@ clim_dist_UCD <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
 
 ```{r}
 #change pop column of clim_dist_UCD to match UCD24_pop
-colnames(clim_dist_UCD)[colnames(clim_dist_UCD) == "parent.pop"] <- "pop.id"
+colnames(clim_dist_UCD)[colnames(clim_dist_UCD) == "parent.pop"] <- "pop"
                                  
 #join clim_dist_UCD to phenology tibble and add binary for initiating reproduction
 UCD_24_model <- UCD24_pop%>%
-  filter(!is.na(pop.id)) %>%
+  filter(!is.na(pop)) %>%
   mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
-  left_join(clim_dist_UCD, by="pop.id")
+  left_join(clim_dist_UCD, by="pop")
 ```
 
 ```{r}
-m2 <- glm(initiate_repro ~ 0 + pop.id,
+m2 <- glm(initiate_repro ~ 0 + pop,
     data= UCD_24_model,
     family = binomial())
 summary(m2)
@@ -609,7 +611,7 @@ plogis(coef(m2))
 
 ```{r}
 #climate distance as a fixed effect and pop as a random
-m4 <- glmer(initiate_repro ~ Gowers_Dist + (1 | pop.id),
+m4 <- glmer(initiate_repro ~ Gowers_Dist + (1 | pop),
             data=UCD_24_model,
             family=binomial)
 summary(m4)
@@ -618,7 +620,7 @@ Anova(m4)
 ```
 
 ```{r}
-m10 <- glmer(initiate_repro ~ (1 | pop.id),
+m10 <- glmer(initiate_repro ~ (1 | pop),
              data=UCD_24_model,
              family=binomial)
 summary(m10)
@@ -846,7 +848,18 @@ WL2_24_pop$bud.date[WL2_24_pop$bed == "F" & WL2_24_pop$row == 26 & WL2_24_pop$co
 print(WL2_24_pop[!is.na(WL2_24_pop$flower.date) & is.na(WL2_24_pop$bud.date), ])
 ```
 
-##### NEED TO ALSO MAKE SURE TO CHECK IF THERE IS A LAST FRUIT WITHOUT LAST FLOWER
+##### NEED TO ALSO MAKE SURE TO CHECK IF THERE IS A LAST FRUIT WITHOUT Fruit or last flower without flower or last fr and no last fl
+
+```{r}
+WL224_lastfr_no_fruit <- WL2_24_pop[!is.na(WL2_24_pop$last.FR.date) & is.na(WL2_24_pop$fruit.date), ] 
+print(WL224_lastfr_no_fruit) 
+
+WL224_lastfl_no_flw <- WL2_24_pop[!is.na(WL2_24_pop$last.FL.date) & is.na(WL2_24_pop$flower.date), ] 
+print(WL224_lastfl_no_flw) 
+
+WL224_lastfl_no_lastflw <- WL2_24_pop[!is.na(WL2_24_pop$last.FR.date) & is.na(WL2_24_pop$last.FL.date), ] 
+print(WL224_lastfl_no_lastflw) #what do I do about this? set last fl the same as last fr?
+```
 
 ```{r}
 WL2_24_proportion <- WL2_24_pop %>%
@@ -901,7 +914,7 @@ bud_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_bud", ]
 flower_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_flower", ] 
 fruit_data2 <- WL2_24_prop_parent[WL2_24_prop_parent$stage == "prop_fruit", ]  
 
-# Merge the data on 'pop.id' 
+# Merge the data on 'pop' 
 merged_data2 <- merge(flower_data2, fruit_data2, by = "pop", suffixes = c("_flower", "_fruit"))  
 merged_data3 <- merge(merged_data2, bud_data2, by="pop")
 
@@ -919,7 +932,7 @@ print(result3[, c("pop", "proportion", "proportion_flower")])
 ```{r}
 clim_dist_WL2 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
 
-colnames(clim_dist_WL2)[colnames(clim_dist_WL2) == "parent.pop"] <- "pop.id"
+colnames(clim_dist_WL2)[colnames(clim_dist_WL2) == "parent.pop"] <- "pop"
 
 WL2_24_model <- WL2_24_pop %>%
   filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer") %>%
