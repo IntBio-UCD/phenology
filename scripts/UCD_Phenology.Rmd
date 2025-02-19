@@ -1,0 +1,94 @@
+---
+title: "UCD_Phenology"
+output: html_document
+date: "2025-02-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(googlesheets4)
+library(lmtest)
+library(car)
+```
+
+```{r}
+UCD22_23_transplant <- read_csv("../input/UCD22_23_transplant.csv")
+UCD22_23_transplant_prop <- read_csv("../input/UCD22_23_transplant_prop.csv")
+UCD22_23_germ <- read_csv("../input/UCD22_23_germ.csv")
+UCD22_23_germ_prop <- read_csv("../input/UCD22_23_germ_prop.csv")
+
+UCD23_24 <- read_csv("../input/UCD23_24.csv")
+UCD23_24_prop <- read_csv("../input/UCD23_24_prop.csv")
+```
+
+```{r}
+
+```
+
+#### Convert Date to Julian Date
+
+```{r}
+#UCD 22-23 transplants
+UCD22_23_transplant$bud.julian <- as.numeric(format(UCD22_23_transplant$bud.date, "%j"))
+UCD22_23_transplant$flower.julian <- as.numeric(format(UCD22_23_transplant$flower.date, "%j"))
+UCD22_23_transplant$fruit.julian <- as.numeric(format(UCD22_23_transplant$fruit.date, "%j"))
+
+#UCD 22-23 germinants
+UCD22_23_germ$bud.julian <- as.numeric(format(UCD22_23_germ$bud.date, "%j"))
+UCD22_23_germ$flower.julian <- as.numeric(format(UCD22_23_germ$flower.date, "%j"))
+UCD22_23_germ$fruit.julian <- as.numeric(format(UCD22_23_germ$fruit.date, "%j"))
+
+#UCD 23-24
+#filter UCD23_24 for only parent pops
+UCD23_24_parent <- UCD23_24 %>%
+  filter(!is.na(pop))
+
+UCD23_24_parent$bud.julian <- as.numeric(format(UCD23_24_parent$bud.date, "%j"))
+UCD23_24_parent$flower.julian <- as.numeric(format(UCD23_24_parent$flower.date, "%j"))
+UCD23_24_parent$fruit.julian <- as.numeric(format(UCD23_24_parent$fruit.date, "%j"))
+```
+
+#### Plotting Julian day means of onset of phenophases
+
+```{r}
+#UCD 22-23 transplant
+UCD22_23t_julian <- UCD22_23_transplant %>%
+  select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  filter(rowSums(is.na(select(., bud.julian, flower.julian, fruit.julian))) < 3) %>%
+  gather(key = "phenophase", value = "julian_day", -pop)
+
+ggplot(UCD22_23t_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+#UCD 22-23 germinants
+UCD22_23g_julian <- UCD22_23_germ %>%
+  select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  filter(rowSums(is.na(select(., bud.julian, flower.julian, fruit.julian))) < 3) %>%
+  gather(key = "phenophase", value = "julian_day", -pop)
+
+ggplot(UCD22_23g_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+#UCD 23-24 
+UCD23_24_julian <- UCD23_24_parent %>%
+  select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  gather(key="phenophase", value="julian_day", -pop)
+
+UCD23_24_julian$phenophase <- factor(UCD23_24_julian$phenophase,
+                                           levels = c("bud.julian", "flower.julian", "fruit.julian"))
+
+UCD23_24_julian %>%
+  filter(!(pop %in% c("LV1", "WL1", "WV", "YO11")))%>%
+  ggplot(aes(x=julian_day, y=phenophase, fill=phenophase)) +
+  geom_boxplot()+
+  facet_wrap(~pop)
+```
