@@ -1,0 +1,58 @@
+---
+title: "WL2_Phenology"
+output: html_document
+date: "2025-02-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(googlesheets4)
+library(lmtest)
+library(car)
+```
+
+```{r}
+WL2_23 <- read_csv("../input/WL2_23.csv")
+WL2_23_prop <- read_csv("../input/WL2_23_prop.csv")
+
+WL2_24 <- read_csv("../input/WL2_24.csv")
+WL2_24_prop <- read_csv("../input/WL2_24_prop.csv")
+```
+
+```{r}
+WL2_23$bud.julian <- as.numeric(format(WL2_23$bud.date, "%j"))
+WL2_23$flower.julian <- as.numeric(format(WL2_23$flower.date, "%j"))
+WL2_23$fruit.julian <- as.numeric(format(WL2_23$fruit.date, "%j"))
+
+WL2_24$bud.julian <- as.numeric(format(WL2_24$bud.date, "%j"))
+WL2_24$flower.julian <- as.numeric(format(WL2_24$flower.date, "%j"))
+WL2_24$fruit.julian <- as.numeric(format(WL2_24$fruit.date, "%j"))
+```
+
+```{r}
+WL2_23_julian <- WL2_23 %>%
+  select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  filter(rowSums(is.na(select(., bud.julian, flower.julian, fruit.julian))) < 3) %>%
+  gather(key = "phenophase", value = "julian_day", -pop)
+
+ggplot(WL2_23_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+WL2_24_julian <- WL2_24 %>%
+  select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  filter(rowSums(is.na(select(., bud.julian, flower.julian, fruit.julian))) < 3) %>%
+  gather(key = "phenophase", value = "julian_day", -pop)
+
+ggplot(WL2_24_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
+  geom_boxplot()+
+  facet_wrap(~pop)
+```
+
