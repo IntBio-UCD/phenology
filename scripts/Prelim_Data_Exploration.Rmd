@@ -23,7 +23,7 @@ library(car)
 ### UCD 2022-2023 Transplants
 
 ```{r}
-UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/Phenology_survey_transplants_20230508_corrected.csv")
+UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/UCD_transplants_pheno_mort_20231016_corrected.csv")
 ```
 
 #### Renaming columns to remove spaces between words and change column name to match other gardens
@@ -34,6 +34,7 @@ colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Fru
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date First Flower"] <- "flower.date"
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Flower"] <- "last.FR.date"
 colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Fruit"] <- "last.FL.date"
+colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Death Date"] <- "death.date"
 
 ```
 
@@ -43,8 +44,9 @@ colnames(UCD_pheno_transplant)[colnames(UCD_pheno_transplant) == "Date Last Frui
 UCD_pheno_transplant$bud.date <- mdy(UCD_pheno_transplant$bud.date)
 UCD_pheno_transplant$flower.date <- mdy(UCD_pheno_transplant$flower.date)
 UCD_pheno_transplant$fruit.date <- mdy(UCD_pheno_transplant$fruit.date)
-UCD_pheno_transplant$last.FL.date <- mdy(UCD_pheno_transplant$last.FL.date) #no last flower dates
-UCD_pheno_transplant$last.FR.date <- mdy(UCD_pheno_transplant$last.FR.date) #no last fruit dates
+UCD_pheno_transplant$last.FL.date <- mdy(UCD_pheno_transplant$last.FL.date)
+UCD_pheno_transplant$last.FR.date <- mdy(UCD_pheno_transplant$last.FR.date)
+UCD_pheno_transplant$death.date <- mdy(UCD_pheno_transplant$death.date)
 ```
 
 ##### Identify which row has the wrong year
@@ -53,12 +55,8 @@ UCD_pheno_transplant$last.FR.date <- mdy(UCD_pheno_transplant$last.FR.date) #no 
 # one first bud date seems to be 2022 which is not correct
 bud2022 <- UCD_pheno_transplant[year(UCD_pheno_transplant$bud.date) == 2022,]
 print(bud2022)
-```
 
-##### Update the year to 2023
-
-```{r}
-# Directly update the date of the 2022 entry
+# Directly update the date of the 2022 entry to 2023
 UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
                        UCD_pheno_transplant$row == 4 & 
                        UCD_pheno_transplant$col == "A", "bud.date"] <- 
@@ -71,7 +69,6 @@ UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" &
 print(UCD_pheno_transplant[UCD_pheno_transplant$block == "L1" & 
                              UCD_pheno_transplant$row == 4 & 
                              UCD_pheno_transplant$col == "A", ])
-
 ```
 
 #### Change date to days since planting
@@ -322,9 +319,7 @@ UCD24_pop[UCD24_pop$bed == "A" &
 print(UCD24_pop[UCD24_pop$bed == "A" & 
                              UCD24_pop$row == 15 & 
                              UCD24_pop$col == "A", ])
-```
 
-```{r}
 bud2014 <- UCD24_pop[year(UCD24_pop$bud.date) == 2014,]
 print(bud2014)
 
@@ -341,9 +336,7 @@ UCD24_pop[UCD24_pop$bed == "C" &
 print(UCD24_pop[UCD24_pop$bed == "C" & 
                              UCD24_pop$row == 35 & 
                              UCD24_pop$col == "D", ])
-```
 
-```{r}
 flw2023 <- UCD24_pop[year(UCD24_pop$flower.date) == 2023,]
 print(flw2023)
 
@@ -375,9 +368,6 @@ print(UCD24_pop[UCD24_pop$bed == "A" &
                              UCD24_pop$row == 17 & 
                              UCD24_pop$col == "C", ])
 
-```
-
-```{r}
 # Directly update the date of the 2014 entry
 UCD24_pop[UCD24_pop$bed == "B" & 
                        UCD24_pop$row == 14 & 
@@ -391,9 +381,7 @@ UCD24_pop[UCD24_pop$bed == "B" &
 print(UCD24_pop[UCD24_pop$bed == "B" & 
                              UCD24_pop$row == 14 & 
                              UCD24_pop$col == "A", ])
-```
 
-```{r}
 # Directly update the date of the 2014 entry
 UCD24_pop[UCD24_pop$bed == "D" & 
                        UCD24_pop$row == 44 & 
@@ -407,9 +395,7 @@ UCD24_pop[UCD24_pop$bed == "D" &
 print(UCD24_pop[UCD24_pop$bed == "D" & 
                              UCD24_pop$row == 44 & 
                              UCD24_pop$col == "D", ])
-```
 
-```{r}
 #CHECK THIS ONE, LAST FR DATE BEFORE LAST FLOWER DATE!!!! - corrected
 #unique.ID 246
 #Checked pdf and confirmed last FR date should be 05/31/2024
@@ -428,9 +414,6 @@ print(UCD24_pop[UCD24_pop$bed == "F" &
                              UCD24_pop$row == 33 & 
                              UCD24_pop$col == "C", ])
 
-```
-
-```{r}
 # Directly update the date of the 2014 entry
 UCD24_pop[UCD24_pop$bed == "C" & 
                        UCD24_pop$row == 31 & 
@@ -444,6 +427,15 @@ UCD24_pop[UCD24_pop$bed == "C" &
 print(UCD24_pop[UCD24_pop$bed == "C" & 
                              UCD24_pop$row == 31 & 
                              UCD24_pop$col == "C", ])
+
+#correct last fruit date
+UCD24_pop[UCD24_pop$bed == "F" &
+            UCD24_pop$row == 34 &
+            UCD24_pop$col == "D", "last.FR.date"] <-
+  update(UCD24_pop[UCD24_pop$bed == "F" &
+            UCD24_pop$row == 34 &
+            UCD24_pop$col == "D", "last.FR.date"][[1]],
+  month=05)
 ```
 
 #### Change date to days since planting
@@ -575,61 +567,19 @@ result <- merged_data[merged_data$proportion_flower < merged_data$proportion_fru
 print(result[, c("pop", "proportion_flower", "proportion_fruit")]) 
 ```
 
-#### Initiate repro by pop
-
-#### Add climate distance data
-
-```{r}
-clim_dist_UCD <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
-```
-
-```{r}
-#change pop column of clim_dist_UCD to match UCD24_pop
-colnames(clim_dist_UCD)[colnames(clim_dist_UCD) == "parent.pop"] <- "pop"
-                                 
-#join clim_dist_UCD to phenology tibble and add binary for initiating reproduction
-UCD_24_model <- UCD24_pop%>%
-  filter(!is.na(pop)) %>%
-  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
-  left_join(clim_dist_UCD, by="pop")
-```
-
-```{r}
-m2 <- glm(initiate_repro ~ 0 + pop,
-    data= UCD_24_model,
-    family = binomial())
-summary(m2)
-
-m3 <- glm(initiate_repro ~ 1,
-    data= UCD_24_model,
-    family = binomial())
-
-lrtest(m3,m2)
-
-plogis(coef(m2))
-```
-
-```{r}
-#climate distance as a fixed effect and pop as a random
-m4 <- glmer(initiate_repro ~ Gowers_Dist + (1 | pop),
-            data=UCD_24_model,
-            family=binomial)
-summary(m4)
-
-Anova(m4)
-```
-
-```{r}
-m10 <- glmer(initiate_repro ~ (1 | pop),
-             data=UCD_24_model,
-             family=binomial)
-summary(m10)
-```
-
 ### WL2 2023
 
 ```{r}
 WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.csv")
+```
+
+#### Change column names to match other data sets
+
+```{r}
+colnames(WL2_pheno)[colnames(WL2_pheno) == "bed.row"] <- "row"
+colnames(WL2_pheno)[colnames(WL2_pheno) == "bed.col"] <- "col"
+colnames(WL2_pheno)[colnames(WL2_pheno) == "last.flower.date"] <- "last.FL.date"
+colnames(WL2_pheno)[colnames(WL2_pheno) == "last.fruit.date"] <- "last.FR.date"
 ```
 
 #### Apply lubridate
@@ -638,8 +588,8 @@ WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.
 WL2_pheno$bud.date <- mdy(WL2_pheno$bud.date)
 WL2_pheno$flower.date <- mdy(WL2_pheno$flower.date)
 WL2_pheno$fruit.date <- mdy(WL2_pheno$fruit.date)
-WL2_pheno$last.flower.date <- mdy(WL2_pheno$last.flower.date)
-WL2_pheno$last.fruit.date <- mdy(WL2_pheno$last.fruit.date)
+WL2_pheno$last.FL.date <- mdy(WL2_pheno$last.FL.date)
+WL2_pheno$last.FR.date <- mdy(WL2_pheno$last.FR.date)
 WL2_pheno$death.date <- mdy(WL2_pheno$death.date)
 ```
 
@@ -653,15 +603,15 @@ print(fruit2014)
 # Directly update the date of the 2013 entry
 WL2_pheno[WL2_pheno$block == "A" & 
                        WL2_pheno$bed == "A" & 
-                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", "fruit.date"] <- 
+                       WL2_pheno$row == 23 & WL2_pheno$col == "D", "fruit.date"] <- 
   update(WL2_pheno[WL2_pheno$block == "A" & 
                        WL2_pheno$bed == "A" & 
-                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", "fruit.date"][[1]], year = 2023)
+                       WL2_pheno$row == 23 & WL2_pheno$col == "D", "fruit.date"][[1]], year = 2023)
 
 # Verify the updated date
 print(WL2_pheno[WL2_pheno$block == "A" & 
                        WL2_pheno$bed == "A" & 
-                       WL2_pheno$bed.row == 23 & WL2_pheno$bed.col == "D", ])
+                       WL2_pheno$row == 23 & WL2_pheno$col == "D", ])
 ```
 
 ```{r}
@@ -760,15 +710,42 @@ WL2_24$death.date <- mdy(WL2_24$death.date)
 WL2_24$missing.date <- mdy(WL2_24$missing.date)
 ```
 
+```{r}
+#what do I do about this? set last fl the same as last fr? YES notes confirm this
+#Update missing last flower dates here
+WL2_24$last.FL.date[WL2_24$last.FL.date[WL2_24$bed == "F" & WL2_24$row == 23 & WL2_24$col == "C"]] <-  as.Date("2024-08-27")
+```
+
 #### Adding pop info for only 2nd year parent pop plants
 
 ```{r}
+#keep only 2nd year parent plant rows
 WL2_24_pop <- WL2_24 %>%
-  mutate(pop = case_when(
-    grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^(\\w+)_\\d+_\\d+$", "\\1", unique.ID),
-    TRUE ~ unique.ID
-  ))
+  filter(grepl("^[A-Za-z]", unique.ID)) %>% #parent plants start with a letter
+  filter(unique.ID != "buffer") #buffers also start with a letter so we remove them
 
+#separate the unique.ID column into seperate pop, mf, and rep columns
+WL2_24_pop <- WL2_24_pop %>%
+  mutate(
+    pop = case_when(
+      grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^(\\w+)_\\d+_\\d+$", "\\1", unique.ID),
+      TRUE ~ unique.ID
+    ),
+    mf = case_when(
+      grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^\\w+_(\\d+)_\\d+$", "\\1", unique.ID),
+      TRUE ~ unique.ID
+    ),
+    rep = case_when(
+      grepl("^\\w+_\\d+_\\d+$", unique.ID) ~ sub("^\\w+_\\d+_(\\d+)$", "\\1", unique.ID),
+      TRUE ~ unique.ID
+    )
+  )
+
+```
+
+#### Convert date to days since planting
+
+```{r}
 WL2_24_pop <- WL2_24_pop %>%
   mutate(
     planting_date = if_else(is.na(block), WL2_23_planting_date, NA_Date_)
@@ -858,7 +835,10 @@ WL224_lastfl_no_flw <- WL2_24_pop[!is.na(WL2_24_pop$last.FL.date) & is.na(WL2_24
 print(WL224_lastfl_no_flw) 
 
 WL224_lastfl_no_lastflw <- WL2_24_pop[!is.na(WL2_24_pop$last.FR.date) & is.na(WL2_24_pop$last.FL.date), ] 
-print(WL224_lastfl_no_lastflw) #what do I do about this? set last fl the same as last fr?
+print(WL224_lastfl_no_lastflw) 
+
+
+
 ```
 
 ```{r}
@@ -925,42 +905,6 @@ result3 <- merged_data3[merged_data3$proportion < merged_data3$proportion_flower
 
 print(result2[, c("pop", "proportion_flower", "proportion_fruit")]) 
 print(result3[, c("pop", "proportion", "proportion_flower")])
-```
-
-#### Initiate reproduction by pop
-
-```{r}
-clim_dist_WL2 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
-
-colnames(clim_dist_WL2)[colnames(clim_dist_WL2) == "parent.pop"] <- "pop"
-
-WL2_24_model <- WL2_24_pop %>%
-  filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer") %>%
-  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
-  left_join(clim_dist_UCD, by="pop")
-```
-
-```{r}
-m1 <- glm(initiate_repro ~ pop,
-    data=WL2_24_model,
-    family = binomial())
-summary(m1)
-
-m0 <- glm(initiate_repro ~ 1,
-    data=WL2_24_model,
-    family = binomial())
-
-lrtest(m0,m1)
-
-plogis(coef(m1))
-```
-
-```{r}
-m5 <- glmer(initiate_repro ~ (1|pop),
-            data=WL2_24_model,
-            family=binomial)
-
-summary(m5)
 ```
 
 Likelihood of flowering given budding
