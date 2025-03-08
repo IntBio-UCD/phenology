@@ -612,6 +612,15 @@ WL2_pheno[WL2_pheno$block == "A" &
 print(WL2_pheno[WL2_pheno$block == "A" & 
                        WL2_pheno$bed == "A" & 
                        WL2_pheno$row == 23 & WL2_pheno$col == "D", ])
+
+
+#UPDATE POP name for one YO4 and one YO8
+WL2_pheno <- WL2_pheno %>%
+  mutate(pop = case_when(
+    pop == "Y04" ~ "YO4",
+    pop == "Y08" ~ "YO8",
+    TRUE ~ pop
+  ))
 ```
 
 ```{r}
@@ -623,6 +632,10 @@ WL2_pheno <- WL2_pheno %>%
   mutate(across(ends_with(".date"),
                 ~ as.integer(ymd(.) - WL2_23_planting_date),
                 .names="{.col}_dfp"))
+
+WL2_pheno <- WL2_pheno %>%
+  mutate(mf= as.numeric(mf),
+         rep= as.numeric(rep))
 
 write.csv(WL2_pheno, "../input/WL2_23.csv", row.names = FALSE)
 ```
