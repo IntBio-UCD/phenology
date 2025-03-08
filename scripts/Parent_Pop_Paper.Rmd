@@ -1,0 +1,175 @@
+---
+title: "Phenology_Models"
+output: html_document
+date: "2025-01-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(googlesheets4)
+library(lmtest)
+library(car)
+```
+
+```{r}
+UCD22_23 <- read_csv("../input/UCD22_23_transplant.csv")
+
+WL2_23 <- read_csv("../input/WL2_23.csv")
+WL2_24 <- read_csv("../input/WL2_24.csv")
+
+clim_dist_UCD22_23 <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
+clim_dist_WL2_23 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
+```
+
+#### Select only the columns of interest and only parent pops from the WL2_24 garden
+
+```{r}
+UCD22_23 <- UCD22_23 %>%
+  mutate(bed = str_extract(block, "^[A-Za-z]")) %>% #create column for bed by extracting info from block column
+  select(block, bed, row, col, everything()) %>% #reorder columns
+  select(block, bed, row, col, pop, mf, rep, bud.date_dfp, flower.date_dfp, fruit.date_dfp, last.FL.date_dfp, last.FR.date_dfp, death.date_dfp) %>% #select columns of interest
+  filter(pop != "buffer") #filter out buffer plants
+
+WL2_23 <- WL2_23 %>%
+  select(block, bed, row, col, pop, mf, rep, bud.date_dfp, flower.date_dfp, fruit.date_dfp, last.FL.date_dfp, last.FR.date_dfp, death.date_dfp) %>%
+  filter(grepl("^\\d+$", rep)) #removes buffer plants and empty spaces
+
+WL2_24 <- WL2_24 %>%
+  select(bed, row, col, pop, mf, rep, bud.date_dfp, flower.date_dfp, fruit.date_dfp, last.FL.date_dfp, last.FR.date_dfp, death.date_dfp) %>%
+  left_join(WL2_23 %>% select(block, bed, row, col), by=c("bed", "row", "col")) %>% #add block info using WL2_23 block column
+  select(block, bed, row, col, everything()) #reorder columns 
+```
+
+#### Combine all gardens into one tibble, add a site column
+
+```{r}
+parent_pheno <- bind_rows(
+  UCD22_23 %>% mutate(site="UCD22_23"),
+  WL2_23 %>% mutate(site="WL2_23"),
+  WL2_24 %>% mutate(site="WL2_24")
+)
+```
+
+#### Add elevation data
+
+```{r}
+clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop)
+
+parent_pheno <- parent_pheno %>%
+  left_join(clim_dist_UCD22_23 %>% select(pop, elev_m), by="pop")
+```
+
+#### Calculate duration of each reproductive stage and add binary column for initiating reproduction
+
+```{r}
+#Bud duration (flower.date - bud.date)
+#Flower duration (last.FL.date - flower.date)
+#Fruit duration (last.FR.date - fruit.date)
+#Total repro duration (last.FR.date - bud.date)
+#Initiate repro(1 if there is any repro date, 0 if no repro date)
+  # I would want to use bud.date to determine if a plant initiated repro, but we missed the bud date for some plants
+
+parent_pheno <- parent_pheno %>%
+  mutate(bud.duration = as.numeric(flower.date_dfp - bud.date_dfp)) %>%
+  mutate(flower.duration = as.numeric(last.FL.date_dfp - flower.date_dfp)) %>%
+  mutate(fruit.duration = as.numeric(last.FR.date_dfp - fruit.date_dfp)) %>%
+  mutate(total.repro.duration = as.numeric(last.FR.date_dfp - bud.date_dfp)) %>%
+  mutate(initiate.repro = if_else(
+      !is.na(bud.date_dfp) | !is.na(flower.date_dfp) | 
+      !is.na(fruit.date_dfp) | !is.na(last.FR.date_dfp) | 
+      !is.na(last.FL.date_dfp), 
+      1, 0
+    ))
+```
+
+##### NEED TO DECIDE IF WE FILL IN FLOWERING DATE THAT WAS MISSED FOR WL2 on 7/23/2024
+
+#### Visualizing each repro duration across sites
+
+```{r}
+parent_pheno %>%
+  filter(!is.na(bud.duration)) %>%
+  filter(!(pop %in% c("CP2", "SQ1", "SQ3", "WR"))) %>%
+  ggplot(aes(y=bud.duration, fill=site)) +
+  geom_boxplot() +
+  facet_wrap(~pop,  scales="free")
+
+parent_pheno %>%
+  filter(!is.na(flower.duration)) %>%
+  #filter(!(pop %in% c("CP2", "SQ1", "SQ3", "WR"))) %>%
+  ggplot(aes(y=flower.duration, fill=site)) +
+  geom_boxplot() +
+  facet_wrap(~pop,  scales="free")
+
+parent_pheno %>%
+  filter(!is.na(fruit.duration)) %>%
+  #filter(!(pop %in% c("CP2", "SQ1", "SQ3", "WR"))) %>%
+  ggplot(aes(y=fruit.duration, fill=site)) +
+  geom_boxplot() +
+  facet_wrap(~pop,  scales="free")
+
+parent_pheno %>%
+  filter(!is.na(total.repro.duration)) %>%
+  #filter(!(pop %in% c("CP2", "SQ1", "SQ3", "WR"))) %>%
+  ggplot(aes(y=total.repro.duration, fill=site)) +
+  geom_boxplot() +
+  facet_wrap(~pop,  scales="free")
+```
+
+#### Model: Does reproductive duration differ by site/elevation?
+
+```{r}
+#does total reproductive duration differ by garden?
+repro_duration <- lmer(total.repro.duration ~ site*elev_m + (1|pop) + (site|block),
+                       data=parent_pheno)
+summary(repro_duration)
+Anova(repro_duration)
+
+#does budding duration differ by garden?
+bud_duration_site<- lmer(bud.duration ~ site + (1|pop),
+                     data=parent_pheno)
+summary(bud_duration_site)
+Anova(bud_duration_site)
+
+bud_duration_elev<- lmer(bud.duration ~ elev_m + (1|block),
+                     data=parent_pheno)
+summary(bud_duration_elev)
+Anova(bud_duration_elev)
+
+#does flowering duration differ by garden?
+flw_duration_site <- lmer(flower.duration ~ site + (1|pop),
+                          data=parent_pheno)
+summary(flw_duration_site)
+Anova(flw_duration_site)
+```
+
+#### Model: Does initiating reproduction differ by site/elevation?
+
+```{r}
+#Does initiating reproduction differ by site with pop as a random effect
+initiate_site <- glmer(initiate.repro ~ site + (1|pop),
+                  data=parent_pheno,
+                  family = binomial())
+
+summary(initiate_site)
+Anova(initiate_site)
+
+#Does initiating reproduction differ by elevation?
+initiate_elev <- glm(initiate.repro ~ elev_m,
+                       data=parent_pheno,
+                       family=binomial())
+summary(initiate_elev)
+initiate_elev_null <- glm(initiate.repro ~ 1,
+                          data=parent_pheno,
+                          family=binomial())
+lrtest(initiate_elev_null, initiate_elev)
+```
