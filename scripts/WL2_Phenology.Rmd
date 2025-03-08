@@ -26,6 +26,8 @@ WL2_24 <- read_csv("../input/WL2_24.csv")
 WL2_24_prop <- read_csv("../input/WL2_24_prop.csv")
 ```
 
+#### Convert Date to Julian Date
+
 ```{r}
 WL2_23$bud.julian <- as.numeric(format(WL2_23$bud.date, "%j"))
 WL2_23$flower.julian <- as.numeric(format(WL2_23$flower.date, "%j"))
@@ -35,6 +37,8 @@ WL2_24$bud.julian <- as.numeric(format(WL2_24$bud.date, "%j"))
 WL2_24$flower.julian <- as.numeric(format(WL2_24$flower.date, "%j"))
 WL2_24$fruit.julian <- as.numeric(format(WL2_24$fruit.date, "%j"))
 ```
+
+#### Plotting Julian day means of onset of phenophases
 
 ```{r}
 WL2_23_julian <- WL2_23 %>%
@@ -48,6 +52,7 @@ ggplot(WL2_23_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
 
 WL2_24_julian <- WL2_24 %>%
   select(pop, bud.julian, flower.julian, fruit.julian) %>%
+  filter(!(pop %in% c("SQ1", "WR"))) %>%
   filter(rowSums(is.na(select(., bud.julian, flower.julian, fruit.julian))) < 3) %>%
   gather(key = "phenophase", value = "julian_day", -pop)
 
@@ -56,3 +61,122 @@ ggplot(WL2_24_julian, aes(x=julian_day, y=phenophase, fill=phenophase)) +
   facet_wrap(~pop)
 ```
 
+```{r}
+WL2_24 <- WL2_24 %>%
+  mutate(FL_duration = as.numeric(last.FL.date_dfp - flower.date_dfp))
+
+WL2_24 <- WL2_24 %>%
+  mutate(FR_duration = as.numeric(last.FR.date_dfp - fruit.date_dfp))
+
+WL2_24 <- WL2_24 %>%
+  mutate(Total_repro_duration = as.numeric(last.FR.date_dfp - bud.date_dfp))
+```
+
+```{r}
+WL2_24_parent <- WL2_24%>%
+  filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer")
+
+WL2_24_model %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(y=FL_duration)) +
+  geom_boxplot()
+
+WL2_24_model %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(x=pop, y=FR_duration)) +
+  geom_boxplot()
+
+WL2_24_model %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(x=pop, y=Total_repro_duration)) +
+  geom_boxplot()
+```
+
+#### Initiate reproduction by pop for WL2 24
+
+```{r}
+clim_dist_WL2_24 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2_2024.csv")
+
+colnames(clim_dist_WL2_24)[colnames(clim_dist_WL2_24) == "parent.pop"] <- "pop"
+
+WL2_24_model <- WL2_24 %>%
+  filter(grepl("^[A-Z]+[0-9]*$", pop) & pop != "buffer") %>%
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
+  left_join(clim_dist_WL2_24, by="pop")
+```
+
+```{r}
+m1 <- glm(initiate_repro ~ -1 + pop,
+    data=WL2_24_model,
+    family = binomial())
+summary(m1)
+
+null1 <- glm(initiate_repro ~ 1,
+    data=WL2_24_model,
+    family = binomial())
+
+lrtest(null1,m1)
+
+#plogis(coef(m1))
+```
+
+```{r}
+mm1 <- glmer(initiate_repro ~ Gowers_Dist + (1|pop),
+            data=WL2_24_model,
+            family=binomial)
+summary(mm1)
+Anova(mm1)
+```
+
+#### Does bud onset differ by pop/Gowers distance
+
+```{r}
+mm2 <- lmer(bud.date_dfp ~ Gowers_Dist + (1|pop),
+            data = WL2_24_model)
+summary(mm2)
+Anova(mm2)
+
+m2 <- glm(bud.date_dfp ~ -1 + pop,
+          data=WL2_24_model,
+          family=gaussian)
+summary(m2)
+```
+
+#### Does flowering duration differ by climate distance?
+
+```{r}
+m3 <- glm(FL_duration ~ Gowers_Dist,
+          data=WL2_24_model,
+          family=gaussian())
+summary(m3)
+
+m3p <- glm(FL_duration ~ pop,
+           data=WL2_24_model,
+           family=gaussian())
+summary(m3p)
+
+m3null <- glm(FL_duration ~ 1,
+              data=WL2_24_model,
+              family=gaussian())
+
+lrtest(m3, m3null)
+lrtest(m3p, m3null)
+
+
+mm3 <- lmer(FL_duration ~ Gowers_Dist + (1|pop),
+            data = WL2_24_model)
+summary(mm3)
+Anova(mm3)
+```
+
+```{r}
+#normal enough? although right/left skewed
+ggplot(WL2_24_model, aes(x=FR_duration)) +
+  geom_bar()
+
+ggplot(WL2_24_model, aes(x=FL_duration)) +
+  geom_bar()
+
+ggplot(WL2_24_model, aes(x=Total_repro_duration)) +
+  geom_bar()
+```
