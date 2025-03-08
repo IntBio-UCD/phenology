@@ -28,10 +28,6 @@ UCD23_24 <- read_csv("../input/UCD23_24.csv")
 UCD23_24_prop <- read_csv("../input/UCD23_24_prop.csv")
 ```
 
-```{r}
-
-```
-
 #### Convert Date to Julian Date
 
 ```{r}
@@ -92,3 +88,107 @@ UCD23_24_julian %>%
   geom_boxplot()+
   facet_wrap(~pop)
 ```
+
+#### Flowering Duration
+
+```{r}
+UCD23_24 <- UCD23_24 %>%
+  mutate(FL_duration = as.numeric(last.FL.date_dfp - flower.date_dfp))
+```
+
+#### Fruit Duration
+
+```{r}
+UCD23_24 <- UCD23_24 %>%
+  mutate(FR_duration = as.numeric(last.FR.date_dfp - fruit.date_dfp))
+```
+
+#### Total Reproductive Duration
+
+```{r}
+UCD23_24 <- UCD23_24 %>%
+  mutate(Total_repro_duration = as.numeric(last.FR.date_dfp - bud.date_dfp))
+
+
+#NEED TO LOOK INTO CALCULATION FOR THIS SINCE SOME TOTAL REPRO LENGTHS ARE SHORTER THAN FLOWERING OR FRUITING
+#WHAT TO DO IF PLANT DIES, USE DEATH DATE TO CALCULATE LAST REPRO?
+```
+
+```{r}
+UCD23_24 %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(x=pop, y=FL_duration)) +
+  geom_boxplot()
+
+UCD23_24 %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(x=pop, y=FR_duration)) +
+  geom_boxplot()
+
+UCD23_24 %>%
+  filter(pop != "NA") %>%
+  ggplot(aes(x=pop, y=Total_repro_duration)) +
+  geom_boxplot()
+```
+
+#### Initiate repro by pop for UCD 22-23 Transplant
+
+#### Add climate distance data
+
+```{r}
+clim_dist_UCD22_23 <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
+```
+
+```{r}
+#change pop column of clim_dist_UCD to match UCD24_pop
+colnames(clim_dist_UCD22_23)[colnames(clim_dist_UCD22_23) == "parent.pop"] <- "pop"
+                                 
+#join clim_dist_UCD to phenology tibble and add binary for initiating reproduction
+UCD22_23_model <- UCD22_23_transplant %>%
+  filter(pop != "buffer") %>%
+  mutate(initiate_repro = if_else(!is.na(bud.date_dfp), 1, 0)) %>%
+  left_join(clim_dist_UCD22_23, by="pop")
+```
+
+```{r}
+m1 <- glm(initiate_repro ~ -1 + pop,
+    data= UCD22_23_model,
+    family = binomial())
+summary(m1)
+
+null1 <- glm(initiate_repro ~ 1,
+    data= UCD22_23_model,
+    family = binomial())
+
+lrtest(null1, m1)
+#pop is a  significant predictor of initiating reproduction, but mostly because only some pops did but many didn't
+
+#plogis(coef(m1))
+```
+
+```{r}
+#climate distance as a fixed effect and pop as a random
+mm1 <- glmer(initiate_repro ~ Gowers_Dist + (1 | pop),
+            data=UCD_24_model,
+            family=binomial)
+summary(mm1)
+
+Anova(mm1)
+```
+
+#### 
+
+Schmid et al 2017
+
+Onset of phenophases- date when the respective stage occurred for the first time
+
+Duration of phenophases- number of days between the onset and the day when the stage became dominant (budding?, flowering = last.FL.date - flower.date, fruiting = last.FR.date - fruit.date) WHAT HAPPENS IF IT INITIATED FL OR FR BUT DIED OR NEVER FINISHED - USE DEATH DATE or...
+
+Total duration- number of days between budding and last fruit WHAT HAPPENS IF THERE IS NO LAST_FR_DATE? need to look at last census for last FR date or use death date as end of repro
+
+```{r}
+
+
+```
+
+ONLY USE TRANSPLANT DATA FROM UCD22-23
