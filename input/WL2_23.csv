@@ -1,4 +1,4 @@
-"block","bed","row","col","pop","mf","rep","bud.date","flower.date","fruit.date","last.FL.date","last.FR.date","death.date","survey.notes","bud.date_dfp","flower.date_dfp","fruit.date_dfp","last.FL.date_dfp","last.FR.date_dfp","death.date_dfp"
+"block","bed","row","col","pop","mf","rep","bud.date","flower.date","fruit.date","last.FL.date","last.FR.date","death.date","survey.notes","bud.date_dt","flower.date_dt","fruit.date_dt","last.FL.date_dt","last.FR.date_dt","death.date_dt"
 "A","A",1,"A","TM2",6,11,2023-08-23,2023-09-13,2023-10-13,NA,NA,NA,NA,35,56,86,NA,NA,NA
 "A","A",1,"B","LVTR1",7,1,NA,NA,NA,NA,NA,2023-07-26,NA,NA,NA,NA,NA,NA,7
 "A","A",2,"A","SQ2",6,14,NA,NA,NA,NA,NA,2023-07-26,NA,NA,NA,NA,NA,NA,7

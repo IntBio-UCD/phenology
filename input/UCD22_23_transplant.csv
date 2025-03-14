@@ -1,4 +1,4 @@
-"block","row","col","pop","mf","rep","bud.date","flower.date","fruit.date","last.FR.date","last.FL.date","death.date","Notes","planting_date","bud.date_dfp","flower.date_dfp","fruit.date_dfp","last.FR.date_dfp","last.FL.date_dfp","death.date_dfp"
+"block","row","col","pop","mf","rep","bud.date","flower.date","fruit.date","last.FR.date","last.FL.date","death.date","Notes","planting_date","bud.date_dt","flower.date_dt","fruit.date_dt","last.FR.date_dt","last.FL.date_dt","death.date_dt"
 "D1",1,"A","buffer",NA,NA,NA,NA,NA,NA,NA,NA,NA,2022-11-27,NA,NA,NA,NA,NA,NA
 "D1",1,"B","buffer",NA,NA,NA,NA,NA,NA,NA,NA,NA,2022-11-27,NA,NA,NA,NA,NA,NA
 "D1",2,"A","buffer",NA,NA,NA,NA,NA,NA,NA,NA,NA,2022-11-27,NA,NA,NA,NA,NA,NA
