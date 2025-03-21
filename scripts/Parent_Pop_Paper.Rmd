@@ -28,6 +28,7 @@ WL2_24 <- read_csv("../input/WL2_24.csv")
 
 clim_dist_UCD22_23 <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
 clim_dist_WL2_23 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
+clim_dist_WL2_24 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2_2024.csv")
 ```
 
 #### Select only the columns of interest and only parent pops from the WL2_24 garden
@@ -313,19 +314,19 @@ repro_summary <- init.repro %>%
 #### Rx norms for total repro duration and bud duration - only BH and TM2
 
 ```{r}
-repro_summary %>%
-  filter(N_repro != 1) %>%
-  ggplot(aes(x=site, y=mean_total_dur, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_total_dur-sem_total_dur, ymax=mean_total_dur+sem_total_dur), width=0.1) 
+#repro_summary %>%
+ # filter(N_repro != 1) %>%
+  #ggplot(aes(x=site, y=mean_total_dur, group=pop, color=elev_m)) +
+  #geom_point(size=1.5) +
+  #geom_line(size=1) +
+  #geom_errorbar(aes(ymin=mean_total_dur-sem_total_dur, ymax=mean_total_dur+sem_total_dur), width=0.1) 
 
-repro_summary %>%
-  filter(N_bud != 1) %>%
-  ggplot(aes(x=site, y=mean_bud_dur, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_bud_dur-sem_bud_dur, ymax=mean_bud_dur+sem_bud_dur), width=0.1) 
+#repro_summary %>%
+ # filter(N_bud != 1) %>%
+  #ggplot(aes(x=site, y=mean_bud_dur, group=pop, color=elev_m)) +
+  #geom_point(size=1.5) +
+  #geom_line(size=1) +
+  #geom_errorbar(aes(ymin=mean_bud_dur-sem_bud_dur, ymax=mean_bud_dur+sem_bud_dur), width=0.1) 
 ```
 
 #### Model: Does days to budding differ by site/elevation?
@@ -355,6 +356,8 @@ dt_bud_both_site <- lmer(bud.date_dt ~ site + (1|pop),
 summary(dt_bud_both_site)
 Anova(dt_bud_both_site)
 ```
+
+#### Dt bud reaction norms
 
 ```{r}
 dt_bud_summary <- init.repro %>%
@@ -407,7 +410,7 @@ dt_bud_summary %>%
  # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
 
-#### Does budding duration differ by elevation/latitude/pops at WL2?
+#### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
 
 ```{r}
 init.repro %>%
@@ -422,19 +425,35 @@ WL2_24_bud_dur <- init.repro %>%
   filter(!(is.na(bud.duration))) %>%
   filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
 
-ggplot(WL2_24_bud_dur, aes(x=bud.duration))+
-  geom_boxplot()+
-  facet_wrap(~pop)
+clim_dist_WL2_24 <- clim_dist_WL2_24 %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop)
+
+WL2_24_bud_dur <- WL2_24_bud_dur %>%
+  left_join(clim_dist_WL2_24 %>% select(pop, Gowers_Dist), by="pop")
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = elev_m)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
 
 WL2_bud_dur_elev <- lmer(bud.duration ~ elev_m + (1|pop),
                     data = WL2_24_bud_dur)
 summary(WL2_bud_dur_elev)
-Anova(WL2_bud_dur_elev) #Elevation is significant but latitude is not
+Anova(WL2_bud_dur_elev) #Elevation is significant but latitude is not - seems like WL2 and YO7 are driving the significance bc they are higher elev pops with shorter durations
 
 WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
                         data=WL2_24_bud_dur)
 summary(WL2_bud_dur_lat)
 Anova(WL2_bud_dur_lat)
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = Gowers_Dist)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_bud_dur_clim <- lmer(bud.duration ~ Gowers_Dist + (1|pop),
+                         data=WL2_24_bud_dur)
+summary(WL2_bud_dur_clim)
+Anova(WL2_bud_dur_clim) #Clim dist is significant, TM2 might be driving this because it is farther and longer duration
 ```
 
 #### Does flowering duration differ by pop at WL2?
