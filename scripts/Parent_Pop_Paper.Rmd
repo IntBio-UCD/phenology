@@ -62,7 +62,7 @@ parent_pheno <- parent_pheno %>%
   separate(site, into = c("site", "year"), sep = "_")
 ```
 
-#### Add elevation data
+#### Add elevation and latitude data
 
 ```{r}
 clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
@@ -70,7 +70,7 @@ clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
   rename(pop=parent.pop)
 
 parent_pheno <- parent_pheno %>%
-  left_join(clim_dist_UCD22_23 %>% select(pop, elev_m), by="pop")
+  left_join(clim_dist_UCD22_23 %>% select(pop, elev_m, Lat), by="pop")
 ```
 
 #### Calculate duration of each reproductive stage and add binary column for initiating reproduction
@@ -172,6 +172,8 @@ parent_pheno %>%
 #### Model: Does initiating reproduction differ by site/elevation?
 
 ```{r}
+#THERE IS A CONVERGENCE ISSUE WITH A SITE*ELEV interaction, so split up the two
+
 #Does initiating reproduction differ by site with pop as a random effect
 initiate_site <- glmer(initiate.repro ~ site + (1|pop),
                   data=parent_pheno,
@@ -181,24 +183,78 @@ summary(initiate_site)
 Anova(initiate_site)
 
 #Does initiating reproduction differ by elevation?
-initiate_elev <- glm(initiate.repro ~ elev_m,
+initiate_elev_pop <- glmer(initiate.repro ~ elev_m + (1|pop),
                        data=parent_pheno,
-                       family=binomial())
-summary(initiate_elev)
+                       family=binomial()) #THERE IS A CONVERGENCE ERROR WITH POP AS A RANDOM EFFECT
+summary(initiate_elev_pop)
+
+
+initiate_elev <- glm(initiate.repro ~ elev_m, 
+                     data= parent_pheno,
+                     family=binomial()) #GLM WITH ONLY ELEV AS PREDICTOR
 initiate_elev_null <- glm(initiate.repro ~ 1,
                           data=parent_pheno,
                           family=binomial())
 lrtest(initiate_elev_null, initiate_elev)
+summary(initiate_elev)
 ```
 
 #### Model: Does reproductive duration differ by site/elevation?
 
 ```{r}
-#Do we want to include year as a random effect because we have 2 years at WL2
-#Do we still see the same pattern removing WL2 2023 individuals?
-
+#filter to only include individuals that initiated reproduction
 init.repro <- parent_pheno %>%
   filter(initiate.repro == 1)
+
+#does budding duration differ by garden?
+bud_dur_int <- lmer(bud.duration ~ site*elev_m + (1|pop),
+                    data=init.repro)
+summary(bud_dur_int)
+Anova(bud_dur_int)
+
+bud_duration_site<- lmer(bud.duration ~ site + (1|pop),
+                     data=init.repro)
+summary(bud_duration_site)
+Anova(bud_duration_site)
+
+bud_duration_elev<- lmer(bud.duration ~ elev_m + (1|pop),
+                     data=init.repro)
+summary(bud_duration_elev)
+Anova(bud_duration_elev)
+
+ICtab(bud_dur_int, bud_duration_site, bud_duration_elev) #site fixed with random  pop is the best fit
+
+
+#Do we want to include year as a random effect because we have 2 years at WL2
+#Do we still see the same pattern removing WL2 2023 individuals?
+#test <- init.repro %>%
+  #filter(!(site == "WL2" & year == 23)) #want to see if having multiple WL2 years impacts the model - NO IT DOES NOT SO I WILL LEAVE IT IN
+#bud_test_no_23 <- lmer(bud.duration ~ site + (1|pop),
+ #                    data=test)
+#summary(bud_test_no_23)
+#Anova(bud_test_no_23)
+
+
+#does flowering duration differ by garden?
+flw_dur <- init.repro %>%
+  filter(!is.na(flower.duration)) #only include indiv that flowered
+         
+flw_dur_int <- lmer(flower.duration ~ site*elev_m + (1|pop),
+                    data=flw_dur)
+summary(flw_dur_int)
+Anova(flw_dur_int)
+
+flw_duration_site <- lmer(flower.duration ~ site + (1|pop),
+                          data=flw_dur)
+summary(flw_duration_site)
+Anova(flw_duration_site)
+
+ICtab(flw_dur_int, flw_duration_site) #just site as a fixed effect is the best fit
+
+#does fruiting duration differ by garden? 
+frt_duration_site <- lmer(fruit.duration ~ site + (1|pop),
+                          data=init.repro)
+Anova(frt_duration_site)
 
 #does total reproductive duration differ by garden?
 repro_duration_interaction <- lmer(total.repro.duration ~ site*elev_m + (1|pop) + (site|block),
@@ -214,45 +270,6 @@ Anova(repro_duration_add)
 
 ICtab(repro_duration_interaction, repro_duration_add)
 
-
-
-
-#does budding duration differ by garden?
-bud_duration_site<- lmer(bud.duration ~ site + (1|pop),
-                     data=init.repro)
-summary(bud_duration_site)
-Anova(bud_duration_site)
-
-bud_duration_elev<- lmer(bud.duration ~ elev_m + (1|block),
-                     data=init.repro)
-summary(bud_duration_elev)
-Anova(bud_duration_elev)
-
-
-
-test <- init.repro %>%
-  filter(!(site == "WL2" & year == 23))
-
-bud_test_no_23 <- lmer(bud.duration ~ site + (1|pop),
-                     data=test)
-summary(bud_test_no_23)
-Anova(bud_test_no_23)
-
-
-
-
-#does flowering duration differ by garden?
-flw_duration_site <- lmer(flower.duration ~ site + (1|pop),
-                          data=init.repro)
-summary(flw_duration_site)
-Anova(flw_duration_site)
-
-
-
-#does fruiting duration differ by garden?
-frt_duration_site <- lmer(fruit.duration ~ site + (1|pop),
-                          data=init.repro)
-Anova(frt_duration_site)
 ```
 
 ```{r}
@@ -293,7 +310,7 @@ repro_summary <- init.repro %>%
             )
 ```
 
-#### Rx norms for total repro duration and bud duration - only BH and TM2 
+#### Rx norms for total repro duration and bud duration - only BH and TM2
 
 ```{r}
 repro_summary %>%
@@ -333,6 +350,10 @@ dt_bud_both <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
 summary(dt_bud_both)
 Anova(dt_bud_both) #BH is the highest of the low elevation pops and has a slighlty steeper slope than the others which is probably what is driving this site*elevation interaction, elevation is now a significant predictor because BH is at a higher elevation than the others but that is because the high elevation pops are no longer considered
 
+dt_bud_both_site <- lmer(bud.date_dt ~ site + (1|pop),
+                         data=both_bud)
+summary(dt_bud_both_site)
+Anova(dt_bud_both_site)
 ```
 
 ```{r}
@@ -353,35 +374,113 @@ dt_bud_summary %>%
 ```
 
 ```{r}
-dt_flw_summary <- init.repro %>%
-  group_by(pop, site, elev_m) %>%
-  summarize(N_flw = sum(!is.na(flower.date_dt)),
-            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
-            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE))
-            )
+#dt_flw_summary <- init.repro %>%
+ # group_by(pop, site, elev_m) %>%
+ # summarize(N_flw = sum(!is.na(flower.date_dt)),
+  #          mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+   #         sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE))
+   #         )
 
-dt_flw_summary %>%
-  filter(N_flw != 1) %>%
-  ggplot(aes(x=site, y=mean_dt_flw, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_dt_flw-sem_dt_flw, ymax=mean_dt_flw+sem_dt_flw), width=0.1) +
-  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+#dt_flw_summary %>%
+ ## filter(N_flw != 1) %>%
+ # ggplot(aes(x=site, y=mean_dt_flw, group=pop, color=elev_m)) +
+ # geom_point(size=1.5) +
+ # geom_line(size=1) +
+ # geom_errorbar(aes(ymin=mean_dt_flw-sem_dt_flw, ymax=mean_dt_flw+sem_dt_flw), width=0.1) +
+ # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
 
 ```{r}
-dt_fr_summary <- init.repro %>%
-  group_by(pop, site, elev_m) %>%
-  summarize(N_fr = sum(!is.na(fruit.date_dt)),
-            mean_dt_fr = mean(fruit.date_dt, na.rm=(TRUE)),
-            sem_dt_fr = sem(fruit.date_dt, na.rm=(TRUE))
-            )
+#dt_fr_summary <- init.repro %>%
+#  group_by(pop, site, elev_m) %>%
+ # summarize(N_fr = sum(!is.na(fruit.date_dt)),
+    #        mean_dt_fr = mean(fruit.date_dt, na.rm=(TRUE)),
+    #        sem_dt_fr = sem(fruit.date_dt, na.rm=(TRUE))
+    #        )
 
-dt_fr_summary %>%
-  filter(N_fr != 1) %>%
-  ggplot(aes(x=site, y=mean_dt_fr, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_dt_fr-sem_dt_fr, ymax=mean_dt_fr+sem_dt_fr), width=0.1) +
-  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+#dt_fr_summary %>%
+#  filter(N_fr != 1) %>%
+ # ggplot(aes(x=site, y=mean_dt_fr, group=pop, color=elev_m)) +
+ # geom_point(size=1.5) +
+ # geom_line(size=1) +
+ # geom_errorbar(aes(ymin=mean_dt_fr-sem_dt_fr, ymax=mean_dt_fr+sem_dt_fr), width=0.1) +
+ # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+```
+
+#### Does budding duration differ by elevation/latitude/pops at WL2?
+
+```{r}
+init.repro %>%
+  filter(site == "WL2") %>%
+  ggplot(aes(x=bud.duration, fill=year)) +
+  geom_boxplot() +
+  facet_wrap(~pop)
+
+WL2_24_bud_dur <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+
+ggplot(WL2_24_bud_dur, aes(x=bud.duration))+
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+WL2_bud_dur_elev <- lmer(bud.duration ~ elev_m + (1|pop),
+                    data = WL2_24_bud_dur)
+summary(WL2_bud_dur_elev)
+Anova(WL2_bud_dur_elev) #Elevation is significant but latitude is not
+
+WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
+                        data=WL2_24_bud_dur)
+summary(WL2_bud_dur_lat)
+Anova(WL2_bud_dur_lat)
+```
+
+#### Does flowering duration differ by pop at WL2?
+
+```{r}
+WL2_24_flw_dur <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(flower.duration))) %>%
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+
+ggplot(WL2_24_flw_dur, aes(x=flower.duration))+
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+WL2_flw_dur_elev <- lmer(flower.duration ~ elev_m + (1|pop),
+                    data = WL2_24_flw_dur) #singularity warning
+summary(WL2_flw_dur_elev)
+Anova(WL2_flw_dur_elev) #marginally significant
+
+WL2_flw_dur_lat <- lmer(flower.duration ~ Lat + (1|pop),
+                        data=WL2_24_flw_dur)
+summary(WL2_flw_dur_lat)
+Anova(WL2_flw_dur_lat) #not significant
+```
+
+#### Does fruiting duration differ by pop at WL2?
+
+```{r}
+WL2_24_fr_dur <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(fruit.duration))) %>%
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+
+ggplot(WL2_24_fr_dur, aes(x=fruit.duration))+
+  geom_boxplot()+
+  facet_wrap(~pop)
+
+WL2_fr_dur_elev <- lmer(fruit.duration ~ elev_m + (1|pop),
+                    data = WL2_24_fr_dur)
+summary(WL2_fr_dur_elev)
+Anova(WL2_fr_dur_elev) 
+
+WL2_fr_dur_lat <- lmer(fruit.duration ~ Lat + (1|pop),
+                        data=WL2_24_fr_dur)
+summary(WL2_fr_dur_lat)
+Anova(WL2_fr_dur_lat) #neither elevation nor lat is significant
 ```
