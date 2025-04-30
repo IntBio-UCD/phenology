@@ -2836,6 +2836,44 @@ summary(UCD_bud_dt_FrFlN2) #not sig
 
 
 ``` r
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+```
+
+```
+## # A tibble: 9 × 2
+##   pop       n
+##   <chr> <int>
+## 1 SQ1       1
+## 2 WR        1
+## 3 WL2       4
+## 4 CC        8
+## 5 SC        8
+## 6 IH       13
+## 7 YO7      15
+## 8 BH       16
+## 9 TM2      28
+```
+
+``` r
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(FrFlw))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+```
+
+```
+## # A tibble: 9 × 2
+##   pop       n
+##   <chr> <int>
+## 1 SQ1       1
+## 2 WR        1
+## 3 WL2       4
+## 4 CC        7
+## 5 SC        8
+## 6 IH       13
+## 7 YO7      15
+## 8 BH       16
+## 9 TM2      28
+```
+
+``` r
 WL2_bud_fit <- init.repro %>%
   filter(site == "WL2") #%>%
   #left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>% #already done in init.repo
@@ -2865,16 +2903,30 @@ WL2_bud_fit %>% #very skewed
 ``` r
 WL2_bud_dur_fit <- WL2_bud_fit %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(Fruits)))
+  filter(!(is.na(Fruits))) %>% 
+  mutate(logFruits=log(Fruits+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
 
-ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=Fruits, color=pop))+
-  geom_point()
+WL2_bud_dur_fit %>% #log transformation helped 
+  ggplot(aes(logFruits)) +
+  geom_histogram()
+```
+
+```
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
 ![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-24-2.png)<!-- -->
 
 ``` r
-WL2_bud_dur_fruit <- lmer(Fruits ~ bud.duration + (1|pop),
+ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=Fruits, color=pop))+
+  geom_point()
+```
+
+![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-24-3.png)<!-- -->
+
+``` r
+WL2_bud_dur_fruit <- lmer(logFruits ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_fit)
 summary(WL2_bud_dur_fruit) #sig negative relationship between bud duration and fruit number
 ```
@@ -2882,31 +2934,31 @@ summary(WL2_bud_dur_fruit) #sig negative relationship between bud duration and f
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: Fruits ~ bud.duration + (1 | pop)
+## Formula: logFruits ~ bud.duration + (1 | pop)
 ##    Data: WL2_bud_dur_fit
 ## 
-## REML criterion at convergence: 825.5
+## REML criterion at convergence: 251.3
 ## 
 ## Scaled residuals: 
-##     Min      1Q  Median      3Q     Max 
-## -1.2957 -0.6025 -0.2588  0.2889  5.0801 
+##      Min       1Q   Median       3Q      Max 
+## -2.13222 -0.70182  0.01371  0.70377  2.69338 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  pop      (Intercept)   2.954   1.719  
-##  Residual             395.387  19.884  
-## Number of obs: 94, groups:  pop, 9
+##  pop      (Intercept) 0.09217  0.3036  
+##  Residual             0.77606  0.8809  
+## Number of obs: 92, groups:  pop, 7
 ## 
 ## Fixed effects:
-##              Estimate Std. Error      df t value Pr(>|t|)    
-## (Intercept)   29.0305     4.0586 29.6437   7.153 6.29e-08 ***
-## bud.duration  -0.6355     0.1994 38.2684  -3.187  0.00286 ** 
+##              Estimate Std. Error       df t value Pr(>|t|)    
+## (Intercept)   3.05486    0.22094 23.66566  13.827  7.9e-13 ***
+## bud.duration -0.03279    0.00996 77.07157  -3.292   0.0015 ** 
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.duratin -0.845
+## bud.duratin -0.724
 ```
 
 ``` r
@@ -2916,106 +2968,110 @@ Anova(WL2_bud_dur_fruit)
 ```
 ## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
-## Response: Fruits
-##               Chisq Df Pr(>Chisq)   
-## bud.duration 10.157  1   0.001437 **
+## Response: logFruits
+##               Chisq Df Pr(>Chisq)    
+## bud.duration 10.836  1  0.0009955 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 ``` r
-WL2_bud_dur_fruit2 <- lmer(Fruits ~ bud.duration + (1|pop) + (1|block),
+WL2_bud_dur_fruit2 <- lmer(logFruits ~ bud.duration + (1|pop) + (1|block),
                           data=WL2_bud_dur_fit)
-summary(WL2_bud_dur_fruit2) #sig negative relationship between bud duration and fruit number
+summary(WL2_bud_dur_fruit2) #relat no longer sig 
 ```
 
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: Fruits ~ bud.duration + (1 | pop) + (1 | block)
+## Formula: logFruits ~ bud.duration + (1 | pop) + (1 | block)
 ##    Data: WL2_bud_dur_fit
 ## 
-## REML criterion at convergence: 817
+## REML criterion at convergence: 235.2
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -1.3813 -0.5387 -0.2533  0.3080  5.2042 
+## -2.5723 -0.4658 -0.0742  0.5498  2.6422 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  block    (Intercept)  67.227   8.199  
-##  pop      (Intercept)   6.168   2.484  
-##  Residual             322.388  17.955  
-## Number of obs: 94, groups:  block, 12; pop, 9
+##  block    (Intercept) 0.21728  0.4661  
+##  pop      (Intercept) 0.09046  0.3008  
+##  Residual             0.55194  0.7429  
+## Number of obs: 92, groups:  block, 12; pop, 7
 ## 
 ## Fixed effects:
-##              Estimate Std. Error      df t value Pr(>|t|)    
-## (Intercept)   24.2872     4.7137 23.0692   5.153 3.17e-05 ***
-## bud.duration  -0.4436     0.1981 35.4648  -2.240   0.0315 *  
+##               Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)   2.698521   0.253755 25.488007  10.634 7.31e-11 ***
+## bud.duration -0.014970   0.009632 70.245100  -1.554    0.125    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.duratin -0.712
+## bud.duratin -0.609
 ```
 
 ``` r
 #testing with FrFlN
 WL2_bud_dur_FrFl <- WL2_bud_fit %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(FrFlw)))
+  filter(!(is.na(FrFlw))) %>% 
+  mutate(logFrFlw=log(FrFlw+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
 
+WL2_bud_dur_FrFl %>% #log transformation helped 
+  ggplot(aes(logFrFlw)) +
+  geom_histogram()
+```
+
+```
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-24-4.png)<!-- -->
+
+``` r
 ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlw, color=pop))+
   geom_point()
 ```
 
-![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-24-3.png)<!-- -->
+![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-24-5.png)<!-- -->
 
 ``` r
-WL2_bud_dur_FrFlN <- lmer(FrFlw ~ bud.duration + (1|pop),
+WL2_bud_dur_FrFlN <- lmer(logFrFlw ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_FrFl)
-```
-
-```
-## boundary (singular) fit: see help('isSingular')
-```
-
-``` r
-#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
 summary(WL2_bud_dur_FrFlN) #sig negative relationship between bud duration and fruit + flower number
 ```
 
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: FrFlw ~ bud.duration + (1 | pop)
+## Formula: logFrFlw ~ bud.duration + (1 | pop)
 ##    Data: WL2_bud_dur_FrFl
 ## 
-## REML criterion at convergence: 815.7
+## REML criterion at convergence: 239.4
 ## 
 ## Scaled residuals: 
-##     Min      1Q  Median      3Q     Max 
-## -1.3742 -0.6181 -0.2651  0.3396  5.0032 
+##      Min       1Q   Median       3Q      Max 
+## -2.39595 -0.72380 -0.05308  0.69169  2.41564 
 ## 
 ## Random effects:
-##  Groups   Name        Variance  Std.Dev. 
-##  pop      (Intercept) 1.530e-15 3.911e-08
-##  Residual             3.934e+02 1.984e+01
-## Number of obs: 93, groups:  pop, 9
+##  Groups   Name        Variance Std.Dev.
+##  pop      (Intercept) 0.03973  0.1993  
+##  Residual             0.71618  0.8463  
+## Number of obs: 91, groups:  pop, 7
 ## 
 ## Fixed effects:
-##              Estimate Std. Error      df t value Pr(>|t|)    
-## (Intercept)   30.2578     3.9945 91.0000   7.575 2.88e-11 ***
-## bud.duration  -0.6427     0.1959 91.0000  -3.281  0.00147 ** 
+##               Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)   3.161850   0.194771 26.156444   16.23 3.55e-15 ***
+## bud.duration -0.033364   0.009243 59.590049   -3.61 0.000629 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.duratin -0.857
-## optimizer (nloptwrap) convergence code: 0 (OK)
-## boundary (singular) fit: see help('isSingular')
+## bud.duratin -0.784
 ```
 
 ``` r
@@ -3025,57 +3081,96 @@ Anova(WL2_bud_dur_FrFlN)
 ```
 ## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
-## Response: FrFlw
-##               Chisq Df Pr(>Chisq)   
-## bud.duration 10.768  1   0.001033 **
+## Response: logFrFlw
+##              Chisq Df Pr(>Chisq)    
+## bud.duration 13.03  1  0.0003066 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 ``` r
-WL2_bud_dur_FrFlN2 <- lmer(FrFlw ~ bud.duration + (1|pop) + (1|block),
+WL2_bud_dur_FrFlN2 <- lmer(logFrFlw ~ bud.duration + (1|pop) + (1|block),
                           data=WL2_bud_dur_FrFl)
-#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
-summary(WL2_bud_dur_FrFlN2) #sig negative relationship between bud duration and fruit + flower number
+summary(WL2_bud_dur_FrFlN2) #relat now marginal 
 ```
 
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: FrFlw ~ bud.duration + (1 | pop) + (1 | block)
+## Formula: logFrFlw ~ bud.duration + (1 | pop) + (1 | block)
 ##    Data: WL2_bud_dur_FrFl
 ## 
-## REML criterion at convergence: 806.1
+## REML criterion at convergence: 222
 ## 
 ## Scaled residuals: 
-##     Min      1Q  Median      3Q     Max 
-## -1.4890 -0.5337 -0.2450  0.3365  5.1667 
+##      Min       1Q   Median       3Q      Max 
+## -2.27178 -0.40296 -0.07092  0.68001  2.41984 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  block    (Intercept)  74.35    8.623  
-##  pop      (Intercept)   2.13    1.459  
-##  Residual             314.26   17.727  
-## Number of obs: 93, groups:  block, 12; pop, 9
+##  block    (Intercept) 0.21580  0.4645  
+##  pop      (Intercept) 0.04134  0.2033  
+##  Residual             0.49616  0.7044  
+## Number of obs: 91, groups:  block, 12; pop, 7
 ## 
 ## Fixed effects:
-##              Estimate Std. Error      df t value Pr(>|t|)    
-## (Intercept)   25.6017     4.6620 20.9770   5.492  1.9e-05 ***
-## bud.duration  -0.4580     0.1917 25.7038  -2.389   0.0245 *  
+##               Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)   2.842942   0.230092 24.790185  12.356 4.32e-12 ***
+## bud.duration -0.016922   0.008776 53.301293  -1.928   0.0592 .  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.duratin -0.707
+## bud.duratin -0.624
 ```
 
 ### Bud timing and fruit/FrFlN at WL2
 
 ``` r
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+```
+
+```
+## # A tibble: 9 × 2
+##   pop       n
+##   <chr> <int>
+## 1 SQ1       1
+## 2 WR        1
+## 3 WL2       4
+## 4 CC        8
+## 5 SC        8
+## 6 IH       13
+## 7 YO7      15
+## 8 BH       16
+## 9 TM2      28
+```
+
+``` r
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(FrFlw))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+```
+
+```
+## # A tibble: 9 × 2
+##   pop       n
+##   <chr> <int>
+## 1 SQ1       1
+## 2 WR        1
+## 3 WL2       4
+## 4 CC        7
+## 5 SC        8
+## 6 IH       13
+## 7 YO7      15
+## 8 BH       16
+## 9 TM2      28
+```
+
+``` r
 WL2_dt_bud_fruit <- WL2_bud_fit %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(Fruits)))
+  filter(!(is.na(Fruits))) %>% 
+  mutate(logFruits=log(Fruits+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals
   
 ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
   geom_point()
@@ -3084,39 +3179,39 @@ ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
 ![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
 
 ``` r
-WL2_bud_dt_fruit <- lmer(Fruits ~ bud.date_dt + (1|pop),
+WL2_bud_dt_fruit <- lmer(logFruits ~ bud.date_dt + (1|pop),
                           data=WL2_dt_bud_fruit) 
-summary(WL2_bud_dt_fruit) #marginal pos relat 
+summary(WL2_bud_dt_fruit) #no sig relat
 ```
 
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: Fruits ~ bud.date_dt + (1 | pop)
+## Formula: logFruits ~ bud.date_dt + (1 | pop)
 ##    Data: WL2_dt_bud_fruit
 ## 
-## REML criterion at convergence: 830.1
+## REML criterion at convergence: 260.2
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -1.1251 -0.6343 -0.3196  0.2875  4.8514 
+## -1.9411 -0.7373 -0.1092  0.7681  2.8004 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  pop      (Intercept)  12.2     3.492  
-##  Residual             410.7    20.266  
-## Number of obs: 94, groups:  pop, 9
+##  pop      (Intercept) 0.1264   0.3555  
+##  Residual             0.8525   0.9233  
+## Number of obs: 92, groups:  pop, 7
 ## 
 ## Fixed effects:
-##             Estimate Std. Error      df t value Pr(>|t|)  
-## (Intercept)   4.4076     7.4582 13.8765   0.591   0.5640  
-## bud.date_dt   0.4649     0.2326 23.2239   1.999   0.0575 .
+##             Estimate Std. Error       df t value Pr(>|t|)    
+## (Intercept)  2.20782    0.40897 35.50647   5.398  4.6e-06 ***
+## bud.date_dt  0.01063    0.01211 65.20478   0.878    0.383    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.date_dt -0.941
+## bud.date_dt -0.908
 ```
 
 ``` r
@@ -3126,55 +3221,55 @@ Anova(WL2_bud_dt_fruit)
 ```
 ## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
-## Response: Fruits
-##              Chisq Df Pr(>Chisq)  
-## bud.date_dt 3.9942  1    0.04566 *
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Response: logFruits
+##              Chisq Df Pr(>Chisq)
+## bud.date_dt 0.7707  1       0.38
 ```
 
 ``` r
-WL2_bud_dt_fruit2 <- lmer(Fruits ~ bud.date_dt + (1|pop) + (1|block),
+WL2_bud_dt_fruit2 <- lmer(logFruits ~ bud.date_dt + (1|pop) + (1|block),
                           data=WL2_dt_bud_fruit) 
-summary(WL2_bud_dt_fruit2) #relat now sig 
+summary(WL2_bud_dt_fruit2) #relat now sig (positive)
 ```
 
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: Fruits ~ bud.date_dt + (1 | pop) + (1 | block)
+## Formula: logFruits ~ bud.date_dt + (1 | pop) + (1 | block)
 ##    Data: WL2_dt_bud_fruit
 ## 
-## REML criterion at convergence: 811.7
+## REML criterion at convergence: 232.2
 ## 
 ## Scaled residuals: 
-##     Min      1Q  Median      3Q     Max 
-## -1.7969 -0.5214 -0.2284  0.3481  4.6823 
+##      Min       1Q   Median       3Q      Max 
+## -2.63874 -0.53535 -0.04803  0.66192  2.23104 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  block    (Intercept) 116.31   10.785  
-##  pop      (Intercept)  40.13    6.335  
-##  Residual             275.34   16.593  
-## Number of obs: 94, groups:  block, 12; pop, 9
+##  block    (Intercept) 0.30778  0.5548  
+##  pop      (Intercept) 0.08649  0.2941  
+##  Residual             0.51441  0.7172  
+## Number of obs: 92, groups:  block, 12; pop, 7
 ## 
 ## Fixed effects:
-##             Estimate Std. Error      df t value Pr(>|t|)   
-## (Intercept)  -5.4357     8.2533 29.9534  -0.659  0.51518   
-## bud.date_dt   0.7100     0.2245 53.1076   3.162  0.00259 **
+##              Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)  1.746659   0.373795 43.079728   4.673 2.92e-05 ***
+## bud.date_dt  0.023169   0.009884 62.485328   2.344   0.0223 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.date_dt -0.843
+## bud.date_dt -0.814
 ```
 
 ``` r
 #testing with FrFlN
 WL2_dt_bud_FrFl <- WL2_bud_fit %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(FrFlw)))
+  filter(!(is.na(FrFlw))) %>% 
+  mutate(logFrFlw=log(FrFlw+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
 
 ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=FrFlw, color=pop)) +
   geom_point()
@@ -3183,7 +3278,7 @@ ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=FrFlw, color=pop)) +
 ![](Parent_Pop_Paper_files/figure-html/unnamed-chunk-25-2.png)<!-- -->
 
 ``` r
-WL2_bud_dt_FrFlN <- lmer(FrFlw ~ bud.date_dt + (1|pop),
+WL2_bud_dt_FrFlN <- lmer(logFrFlw ~ bud.date_dt + (1|pop),
                           data=WL2_dt_bud_FrFl) 
 summary(WL2_bud_dt_FrFlN) #not sig 
 ```
@@ -3191,31 +3286,31 @@ summary(WL2_bud_dt_FrFlN) #not sig
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: FrFlw ~ bud.date_dt + (1 | pop)
+## Formula: logFrFlw ~ bud.date_dt + (1 | pop)
 ##    Data: WL2_dt_bud_FrFl
 ## 
-## REML criterion at convergence: 821.9
+## REML criterion at convergence: 250.4
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -1.1282 -0.6521 -0.3130  0.3328  4.8005 
+## -2.1585 -0.7000 -0.1200  0.7451  2.5692 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  pop      (Intercept)   9.052   3.009  
-##  Residual             415.504  20.384  
-## Number of obs: 93, groups:  pop, 9
+##  pop      (Intercept) 0.06424  0.2535  
+##  Residual             0.80461  0.8970  
+## Number of obs: 91, groups:  pop, 7
 ## 
 ## Fixed effects:
-##             Estimate Std. Error      df t value Pr(>|t|)  
-## (Intercept)   7.1551     7.3020 11.1694   0.980   0.3479  
-## bud.date_dt   0.4075     0.2299 18.7722   1.773   0.0925 .
+##              Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)  2.351765   0.368595 26.153968   6.380 9.05e-07 ***
+## bud.date_dt  0.008786   0.011248 44.410447   0.781    0.439    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.date_dt -0.942
+## bud.date_dt -0.926
 ```
 
 ``` r
@@ -3225,15 +3320,13 @@ Anova(WL2_bud_dt_FrFlN)
 ```
 ## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
-## Response: FrFlw
-##              Chisq Df Pr(>Chisq)  
-## bud.date_dt 3.1426  1    0.07627 .
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Response: logFrFlw
+##              Chisq Df Pr(>Chisq)
+## bud.date_dt 0.6101  1     0.4348
 ```
 
 ``` r
-WL2_bud_dt_FrFlN2 <- lmer(FrFlw ~ bud.date_dt + (1|pop) + (1|block),
+WL2_bud_dt_FrFlN2 <- lmer(logFrFlw ~ bud.date_dt + (1|pop) + (1|block),
                           data=WL2_dt_bud_FrFl) 
 summary(WL2_bud_dt_FrFlN2) #relat now sig (pos)
 ```
@@ -3241,32 +3334,32 @@ summary(WL2_bud_dt_FrFlN2) #relat now sig (pos)
 ```
 ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
 ## lmerModLmerTest]
-## Formula: FrFlw ~ bud.date_dt + (1 | pop) + (1 | block)
+## Formula: logFrFlw ~ bud.date_dt + (1 | pop) + (1 | block)
 ##    Data: WL2_dt_bud_FrFl
 ## 
-## REML criterion at convergence: 801.7
+## REML criterion at convergence: 220.6
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -1.8038 -0.5519 -0.1712  0.3666  4.6100 
+## -2.2955 -0.5278  0.0303  0.6588  2.0937 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  block    (Intercept) 129.56   11.383  
-##  pop      (Intercept)  50.82    7.129  
-##  Residual             264.54   16.265  
-## Number of obs: 93, groups:  block, 12; pop, 9
+##  block    (Intercept) 0.30727  0.5543  
+##  pop      (Intercept) 0.06119  0.2474  
+##  Residual             0.46359  0.6809  
+## Number of obs: 91, groups:  block, 12; pop, 7
 ## 
 ## Fixed effects:
-##             Estimate Std. Error      df t value Pr(>|t|)   
-## (Intercept)  -5.0903     8.4392 32.1329  -0.603  0.55063   
-## bud.date_dt   0.7219     0.2255 61.6862   3.202  0.00216 **
+##              Estimate Std. Error        df t value Pr(>|t|)    
+## (Intercept)  1.962064   0.350165 37.286938   5.603 2.11e-06 ***
+## bud.date_dt  0.019978   0.009243 53.180583   2.162   0.0352 *  
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr)
-## bud.date_dt -0.830
+## bud.date_dt -0.807
 ```
 
 ## Rx norms for total repro duration and bud duration - only BH and TM2

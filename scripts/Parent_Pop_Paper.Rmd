@@ -719,6 +719,8 @@ summary(UCD_bud_dt_FrFlN2) #not sig
 ### Bud duration and fruit/FrFlN at WL2
 
 ```{r}
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(FrFlw))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 WL2_bud_fit <- init.repro %>%
   filter(site == "WL2") #%>%
   #left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>% #already done in init.repo
@@ -732,74 +734,92 @@ WL2_bud_fit <- init.repro %>%
 WL2_bud_fit %>% #very skewed 
   ggplot(aes(Fruits)) +
   geom_histogram()
+
 WL2_bud_dur_fit <- WL2_bud_fit %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(Fruits)))
+  filter(!(is.na(Fruits))) %>% 
+  mutate(logFruits=log(Fruits+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
+
+WL2_bud_dur_fit %>% #log transformation helped 
+  ggplot(aes(logFruits)) +
+  geom_histogram()
 
 ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=Fruits, color=pop))+
   geom_point()
 
-WL2_bud_dur_fruit <- lmer(Fruits ~ bud.duration + (1|pop),
+WL2_bud_dur_fruit <- lmer(logFruits ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_fit)
 summary(WL2_bud_dur_fruit) #sig negative relationship between bud duration and fruit number
 Anova(WL2_bud_dur_fruit)
 
-WL2_bud_dur_fruit2 <- lmer(Fruits ~ bud.duration + (1|pop) + (1|block),
+WL2_bud_dur_fruit2 <- lmer(logFruits ~ bud.duration + (1|pop) + (1|block),
                           data=WL2_bud_dur_fit)
-summary(WL2_bud_dur_fruit2) #sig negative relationship between bud duration and fruit number
+summary(WL2_bud_dur_fruit2) #relat no longer sig 
 
 #testing with FrFlN
 WL2_bud_dur_FrFl <- WL2_bud_fit %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(FrFlw)))
+  filter(!(is.na(FrFlw))) %>% 
+  mutate(logFrFlw=log(FrFlw+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
+
+WL2_bud_dur_FrFl %>% #log transformation helped 
+  ggplot(aes(logFrFlw)) +
+  geom_histogram()
 
 ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlw, color=pop))+
   geom_point()
 
-WL2_bud_dur_FrFlN <- lmer(FrFlw ~ bud.duration + (1|pop),
+WL2_bud_dur_FrFlN <- lmer(logFrFlw ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_FrFl)
-#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
 summary(WL2_bud_dur_FrFlN) #sig negative relationship between bud duration and fruit + flower number
 Anova(WL2_bud_dur_FrFlN)
 
-WL2_bud_dur_FrFlN2 <- lmer(FrFlw ~ bud.duration + (1|pop) + (1|block),
+WL2_bud_dur_FrFlN2 <- lmer(logFrFlw ~ bud.duration + (1|pop) + (1|block),
                           data=WL2_bud_dur_FrFl)
-#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
-summary(WL2_bud_dur_FrFlN2) #sig negative relationship between bud duration and fruit + flower number
+summary(WL2_bud_dur_FrFlN2) #relat now marginal 
 ```
 
 ### Bud timing and fruit/FrFlN at WL2
 ```{r}
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(FrFlw))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+
 WL2_dt_bud_fruit <- WL2_bud_fit %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(Fruits)))
+  filter(!(is.na(Fruits))) %>% 
+  mutate(logFruits=log(Fruits+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals
   
 ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
   geom_point()
 
-WL2_bud_dt_fruit <- lmer(Fruits ~ bud.date_dt + (1|pop),
+WL2_bud_dt_fruit <- lmer(logFruits ~ bud.date_dt + (1|pop),
                           data=WL2_dt_bud_fruit) 
-summary(WL2_bud_dt_fruit) #marginal pos relat 
+summary(WL2_bud_dt_fruit) #no sig relat
 Anova(WL2_bud_dt_fruit) 
 
-WL2_bud_dt_fruit2 <- lmer(Fruits ~ bud.date_dt + (1|pop) + (1|block),
+WL2_bud_dt_fruit2 <- lmer(logFruits ~ bud.date_dt + (1|pop) + (1|block),
                           data=WL2_dt_bud_fruit) 
-summary(WL2_bud_dt_fruit2) #relat now sig 
+summary(WL2_bud_dt_fruit2) #relat now sig (positive)
 
 #testing with FrFlN
 WL2_dt_bud_FrFl <- WL2_bud_fit %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(FrFlw)))
+  filter(!(is.na(FrFlw))) %>% 
+  mutate(logFrFlw=log(FrFlw+1)) %>% 
+  filter(!(pop %in% c("SQ1", "WR"))) #too few individuals 
 
 ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=FrFlw, color=pop)) +
   geom_point()
 
-WL2_bud_dt_FrFlN <- lmer(FrFlw ~ bud.date_dt + (1|pop),
+WL2_bud_dt_FrFlN <- lmer(logFrFlw ~ bud.date_dt + (1|pop),
                           data=WL2_dt_bud_FrFl) 
 summary(WL2_bud_dt_FrFlN) #not sig 
 Anova(WL2_bud_dt_FrFlN) 
 
-WL2_bud_dt_FrFlN2 <- lmer(FrFlw ~ bud.date_dt + (1|pop) + (1|block),
+WL2_bud_dt_FrFlN2 <- lmer(logFrFlw ~ bud.date_dt + (1|pop) + (1|block),
                           data=WL2_dt_bud_FrFl) 
 summary(WL2_bud_dt_FrFlN2) #relat now sig (pos)
 ```
