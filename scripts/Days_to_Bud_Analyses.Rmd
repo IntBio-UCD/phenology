@@ -1,6 +1,8 @@
 ---
 title: "Days_to_Bud_Analyses"
-output: html_document
+output: 
+  html_document: 
+    keep_md: true
 date: "2025-04-08"
 ---
 
@@ -18,6 +20,10 @@ library(googlesheets4)
 library(lmtest)
 library(car)
 library(lmerTest)
+
+sem <- function(x, na.rm=FALSE) {           #for caclulating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
 ```
 
 ```{r}
@@ -25,9 +31,17 @@ init.repro <- read_csv("../input/init.repro.csv")
 parent_pheno <- read_csv("../input/parent_pheno.csv")
 ```
 
+## Only pops that budded at both gardens
+```{r}
+init.repro %>% filter(!is.na(bud.date_dt)) %>% group_by(pop, site) %>% summarise(n=n()) 
+#ONLY INCLUDING POPS THAT BUDDED AT BOTH GARDENS IN THE MODEL
+both_bud <- init.repro %>%
+  filter(pop %in% c("BH", "TM2", "SC")) #CC only has 2 indivs at UCD, FR has less than 3 at both sites, WL2 only has 1 indiv at UCD
+```
+
 #### Model: Does days to budding differ by site/elevation?
 
-```{r}
+```{r, eval=FALSE}
 dt_bud <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
                data=init.repro)
 summary(dt_bud)
@@ -37,10 +51,6 @@ dt_flw <- lmer(flower.date_dt ~ site*elev_m + (1|pop),
                data=init.repro)
 summary(dt_flw)
 Anova(dt_flw)
-
-#ONLY INCLUDING POPS THAT BUDDED AT BOTH GARDENS IN THE MODEL
-both_bud <- init.repro %>%
-  filter(pop %in% c("BH", "TM2", "CC", "SC"))
 
 dt_bud_both <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
                data=both_bud)
@@ -56,7 +66,7 @@ Anova(dt_bud_both_site)
 #### Dt bud reaction norms
 
 ```{r}
-dt_bud_summary <- init.repro %>%
+dt_bud_summary <- both_bud %>%
   group_by(pop, site, elev_m) %>%
   summarize(N_bud = sum(!is.na(bud.date_dt)),
             mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
@@ -103,7 +113,7 @@ init.repro %>%
 
 
 
-scale_bud <- init.repro %>%
+scale_bud <- both_bud %>%
   mutate(log_dt_bud = log(bud.date_dt)) %>%
   mutate(sqrt_dt_bud =sqrt(bud.date_dt))
 
@@ -113,10 +123,9 @@ scale_log_dt_bud <- lmer(log_dt_bud ~ site + (1|pop),
 
 summary(scale_log_dt_bud)
 Anova(scale_log_dt_bud)
-
 plot(scale_log_dt_bud, which = 1)
 qqnorm(resid(scale_log_dt_bud))
-qqline(resid(scale_log_dt_bud))
+qqline(resid(scale_log_dt_bud)) #fit diagnostics not great 
 
 
 #GAMMA distribution with log link - BAD!
@@ -176,7 +185,7 @@ dt_bud_summary_scaled %>%
 
 #### Dt bud at WL2 and climate distance
 
-```{r}
+```{r, eval=FALSE}
 WL2_24_dt_bud <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
@@ -209,7 +218,7 @@ Anova(WL2_dt_bud_WtrYr)
 
 #### Dt bud at UCD and climate distance
 
-```{r}
+```{r, eval=FALSE}
 clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
   rename(pop=parent.pop) %>%
   rename(GrwSsn_GD=Gowers_Dist)%>%
