@@ -80,7 +80,7 @@ UCD_pheno_transplant <- UCD_pheno_transplant %>%
   )
 
 UCD_pheno_transplant <- UCD_pheno_transplant %>%
-  mutate(across(ends_with(".date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dfp"))
+  mutate(across(ends_with(".date"), ~ as.integer(as.Date(.) - planting_date), .names="{.col}_dt"))
 
 write.csv(UCD_pheno_transplant, "../input/UCD22_23_transplant.csv", row.names = FALSE)
 ```
@@ -625,13 +625,13 @@ WL2_pheno <- WL2_pheno %>%
 
 ```{r}
 #THIS PLANTING IS HARDER TO ASSIGN A PLANTING DAY SINCE IT IS DONE BY BLOCK
-#For now I will call the planting date the day when all the plants were in field conditions
+#I will call the planting date the day when all the plants were in field conditions the previous year
 WL2_23_planting_date <- mdy("07/19/2023")
 
 WL2_pheno <- WL2_pheno %>%
   mutate(across(ends_with(".date"),
                 ~ as.integer(ymd(.) - WL2_23_planting_date),
-                .names="{.col}_dfp"))
+                .names="{.col}_dt"))
 
 WL2_pheno <- WL2_pheno %>%
   mutate(mf= as.numeric(mf),
@@ -756,24 +756,46 @@ WL2_24_pop <- WL2_24_pop %>%
 
 ```
 
+#### Update missing flower dates
+
+```{r}
+WL2_24_pop$flower.date[WL2_24_pop$bed == "A" & WL2_24_pop$row == 18 & WL2_24_pop$col == "A"] <- as.Date("2024-07-23")
+
+WL2_24_pop$flower.date[WL2_24_pop$bed == "E" & WL2_24_pop$row == 49 & WL2_24_pop$col == "B"] <- as.Date("2024-07-23")
+
+WL2_24_pop$flower.date[WL2_24_pop$bed == "J" & WL2_24_pop$row == 4 & WL2_24_pop$col == "A"] <- as.Date("2024-07-09")
+
+WL2_24_pop_no_flw <- WL2_24_pop %>%
+  filter(!is.na(fruit.date) & is.na(flower.date)) #only individual with a fruit date missing a flower date is a plant mistakenly coded as a buffer
+```
+
 #### Convert date to days since planting
 
 ```{r}
+#WL2_24_pop <- WL2_24_pop %>%
+  #mutate(
+   # planting_date = if_else(is.na(block), WL2_23_planting_date, NA_Date_)
+ # ) %>%
+ # mutate(across(
+  #  ends_with(".date"),  
+  #  ~ if_else(is.na(block), as.integer(ymd(.) - WL2_23_planting_date), NA_integer_),  
+  #  .names = "{.col}_dfp"  
+ # ))
+
+#ALSO CALCULATE DAYS SINCE SNOW MELT TO GET WITHIN GROWING SEASON TIMING
+WL2_24_snow_melt <- mdy("05/27/2024")
+
 WL2_24_pop <- WL2_24_pop %>%
-  mutate(
-    planting_date = if_else(is.na(block), WL2_23_planting_date, NA_Date_)
-  ) %>%
-  mutate(across(
-    ends_with(".date"),  
-    ~ if_else(is.na(block), as.integer(ymd(.) - WL2_23_planting_date), NA_integer_),  
-    .names = "{.col}_dfp"  
-  ))
+  mutate(across(ends_with(".date"),
+                ~ as.integer(ymd(.) - WL2_24_snow_melt),
+                .names="{.col}_dt"))
+
+write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
 ```
 
 #### Visualize days since planting
 
 ```{r}
-write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
 
 ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
   geom_histogram() +
