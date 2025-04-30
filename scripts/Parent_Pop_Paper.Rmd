@@ -18,6 +18,10 @@ library(googlesheets4)
 library(lmtest)
 library(car)
 library(lmerTest)
+
+sem <- function(x, na.rm=FALSE) {           #for caclulating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
 ```
 
 ```{r}
@@ -361,33 +365,42 @@ init.repro <- parent_pheno_duration %>%
 ### Bud duration and survival to make at least one fruit at WL2
 
 ```{r}
+init.repro %>% filter(site == "WL2")  %>% filter(year == 24) %>% filter(!(is.na(bud.duration))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 WL2_bud_dur_frt_prob <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) %>%
-  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) #%>%
+  #left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col")) #already in init.repro
   
-ggplot(WL2_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
+ggplot(WL2_bud_dur_frt_prob, aes(x=bud.duration, y=WL2_Y2_Prob_Fruits, color=pop)) +
   geom_jitter(height=0.01)
 
-WL2_24_bud_dur_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
+WL2_24_bud_dur_prob_fruit <- glmer(WL2_Y2_Prob_Fruits ~ bud.duration + (1|pop),
                                    data=WL2_bud_dur_frt_prob,
                                    family=binomial)
-summary(WL2_24_bud_dur_prob_fruit)
+#boundary (singular) fit: see help('isSingular') # pop explains little variation 
+summary(WL2_24_bud_dur_prob_fruit) 
 Anova(WL2_24_bud_dur_prob_fruit)
 
+WL2_24_bud_dur_prob_fruit2 <- glmer(WL2_Y2_Prob_Fruits ~ bud.duration + (1|pop) + (1|block),
+                                   data=WL2_bud_dur_frt_prob,
+                                   family=binomial)
+summary(WL2_24_bud_dur_prob_fruit2) #sig negative relationship with bud duration (shorter bud duration = better)
+Anova(WL2_24_bud_dur_prob_fruit2)
+
 #could calculate mean prob of making fruit and mean bud duration for each pop - but lose indiv variation
-WL2_bud_dur_mean_frt_prob <- WL2_bud_dt_frt_prob %>%
+WL2_bud_dur_mean_frt_prob <- WL2_bud_dur_frt_prob %>%
   group_by(pop) %>%
-  summarize(mean_frt_prob = mean(ProbFruits, na.rm=TRUE),
-            sem_frt_prob = sem(ProbFruits, na.rm=TRUE),
+  summarize(mean_frt_prob = mean(WL2_Y2_Prob_Fruits, na.rm=TRUE),
+            sem_frt_prob = sem(WL2_Y2_Prob_Fruits, na.rm=TRUE),
             mean_bud_dur = mean(bud.duration, na.rm=TRUE),
             sem_bud_dur= sem(bud.duration, na.rm=TRUE)) %>%
   ungroup()
 
 ggplot(WL2_bud_dur_mean_frt_prob, aes(x=mean_bud_dur, y=mean_frt_prob, color=pop))+
-  geom_point()
+  geom_point() +
+  geom_errorbar(aes(ymin=mean_frt_prob-sem_frt_prob,ymax=mean_frt_prob+sem_frt_prob),width=.2)
 
 mean_frt_prob_reg <- glm(mean_frt_prob ~ mean_bud_dur,
                          family=gaussian(),
@@ -398,131 +411,208 @@ Anova(mean_frt_prob_reg)
 
 ### Bud timing and survival to make at least one fruit at WL2
 ```{r}
+init.repro %>% filter(site == "WL2")  %>% filter(year == 24) %>% filter(!(is.na(bud.date_dt))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 WL2_bud_dt_frt_prob <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(pop %in% c("SQ1", "WR"))) %>%
-  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
+  filter(!(pop %in% c("SQ1", "WR"))) #%>%
+  #left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col")) #already in init.repro
   
-ggplot(WL2_bud_dt_frt_prob, aes(x=bud.date_dt, y=ProbFruits, color=pop)) +
+ggplot(WL2_bud_dt_frt_prob, aes(x=bud.date_dt, y=WL2_Y2_Prob_Fruits, color=pop)) +
   geom_jitter(height=0.01)
   
-WL2_24_bud_dt_prob_fruit <- glmer(ProbFruits ~ bud.date_dt + (1|pop),
+WL2_24_bud_dt_prob_fruit <- glmer(WL2_Y2_Prob_Fruits ~ bud.date_dt + (1|pop),
                                    data=WL2_bud_dt_frt_prob,
                                    family=binomial)
-summary(WL2_24_bud_dt_prob_fruit)
+#boundary (singular) fit: see help('isSingular') #b/c pop explains 0 var 
+summary(WL2_24_bud_dt_prob_fruit) 
 Anova(WL2_24_bud_dt_prob_fruit)
-```
 
-### Bud duration and survival to make at least one fruit at UCD
-
-```{r}
-UCD_bud_dur_frt_prob <- init.repro %>%
-  filter(site == "UCD") %>%
-  filter(!(is.na(bud.duration))) %>%
-  filter(pop %in% c("BH", "TM2")) %>%
-  left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col"))
-  
-ggplot(UCD_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
-  geom_jitter(height=0.01)
-
-UCD_bud_dur_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
-                                   data=UCD_bud_dur_frt_prob,
+WL2_24_bud_dt_prob_fruit2 <- glmer(WL2_Y2_Prob_Fruits ~ bud.date_dt + (1|pop) + (1|block),
+                                   data=WL2_bud_dt_frt_prob,
                                    family=binomial)
-summary(UCD_bud_dur_prob_fruit)
-Anova(UCD_bud_dur_prob_fruit)
-```
-
-### Bud timing and survival to make at least one fruit at UCD
-```{r}
-UCD_bud_dt_frt_prob <- init.repro %>%
-  filter(site == "UCD") %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(!(pop %in% c("CP2", "FR", "SQ3", "WL2"))) %>%
-  left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col"))
-  
-ggplot(UCD_bud_dt_frt_prob, aes(x=bud.date_dt, y=ProbFruits, color=pop)) +
-  geom_jitter(height=0.01)
-  
-UCD_bud_dt_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
-                                   data=UCD_bud_dt_frt_prob,
-                                   family=binomial)
-summary(UCD_bud_dt_prob_fruit)
-Anova(UCD_bud_dt_prob_fruit)
+#boundary (singular) fit: see help('isSingular') #b/c pop explains 0 var
+summary(WL2_24_bud_dt_prob_fruit2) #sig neg relat (shorter days to budding is better)
+Anova(WL2_24_bud_dt_prob_fruit2)
 ```
 
 ### Both WL2 years and probability of successfully reproducing
 
 ```{r}
-WL2_prob_fit <- WL2_prob_fit %>%
-  rename(row=bed.row) %>%
-  rename(col=bed.col)
-
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 all_WL2_fit_prob_bud_dur <- init.repro %>%
   filter(site == "WL2")  %>%
   filter(!(is.na(bud.duration))) %>%
-  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) %>%
+  #left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) %>% #already in init_repro
   filter(!(pop %in% c("SQ1", "WR")))
 
-ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=ProbFitness, color=pop)) +
+ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=WL2_ProbFitness, color=pop)) +
   geom_jitter(height=0.01)
 
-prob_fit_bud_dur <- glmer(ProbFitness ~ bud.duration + (1|pop),
+prob_fit_bud_dur <- glmer(WL2_ProbFitness ~ bud.duration + (1|pop),
                                    data=all_WL2_fit_prob_bud_dur,
                                    family=binomial)
-summary(prob_fit_bud_dur)
+#boundary (singular) fit: see help('isSingular') #pop explains 0 var 
+summary(prob_fit_bud_dur) #sig neg relat 
 Anova(prob_fit_bud_dur)
 plogis(fixef(prob_fit_bud_dur)) #Back transforming/Inverse Logit of the fixed effect coefficients
+
+prob_fit_bud_dur2 <- glmer(WL2_ProbFitness ~ bud.duration + (1|pop) + (1|block),
+                                   data=all_WL2_fit_prob_bud_dur,
+                                   family=binomial)
+summary(prob_fit_bud_dur2) #relat no longer sig with block in model 
+Anova(prob_fit_bud_dur2)
+
+ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=WL2_ProbFitness, color=pop)) +
+  geom_jitter(height=0.01) +
+  facet_wrap(~block) #some blocks only have 1 or 2 individuals 
+all_WL2_fit_prob_bud_dur %>% group_by(block) %>% summarise(n=n()) %>% arrange(n) #take blocks D and L out since less than 3 individuals
+
+all_WL2_fit_prob_bud_dur_blocks <- all_WL2_fit_prob_bud_dur %>% 
+  filter(block!="D", block!="L")
+
+prob_fit_bud_dur3 <- glmer(WL2_ProbFitness ~ bud.duration + (1|pop) + (1|block),
+                                   data=all_WL2_fit_prob_bud_dur_blocks,
+                                   family=binomial)
+summary(prob_fit_bud_dur3) #relat still not sig 
+Anova(prob_fit_bud_dur3)
 ```
 
 ```{r}
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 all_WL2_fit_prob_dt_bud <- init.repro %>%
   filter(site == "WL2")  %>%
   filter(!(is.na(bud.date_dt))) %>%
-  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) #%>%
-  #filter(!(pop %in% c("SQ1", "WR")))
+  #left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) #%>% #already in init_repro
+  filter(!(pop %in% c("SQ1", "WR", "FR"))) #less than 3 individuals 
 
-ggplot(all_WL2_fit_prob_dt_bud, aes(x=bud.date_dt, y=ProbFitness, color=pop)) +
+ggplot(all_WL2_fit_prob_dt_bud, aes(x=bud.date_dt, y=WL2_ProbFitness, color=pop)) +
   geom_jitter(height=0.01)
 
-prob_fit_dt_bud <- glmer(ProbFitness ~ bud.date_dt + (1|pop),
+prob_fit_dt_bud <- glmer(WL2_ProbFitness ~ bud.date_dt + (1|pop),
                                    data=all_WL2_fit_prob_dt_bud,
                                    family=binomial)
-summary(prob_fit_dt_bud)
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(prob_fit_dt_bud) #sig neg relat (shorter days to budding better)
 Anova(prob_fit_dt_bud)
+
+prob_fit_dt_bud2 <- glmer(WL2_ProbFitness ~ bud.date_dt + (1|pop) + (1|block),
+                                   data=all_WL2_fit_prob_dt_bud,
+                                   family=binomial)
+summary(prob_fit_dt_bud2) #relat still sig after adding block 
+Anova(prob_fit_dt_bud2)
+```
+
+### Bud duration and survival to make at least one fruit at UCD
+
+```{r}
+init.repro %>% filter(site == "UCD")  %>% filter(!(is.na(bud.duration))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+UCD_bud_dur_frt_prob <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "TM2"))# %>% #only 2 pops with high enough sample size 
+ # left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col")) #already in init_repro
+  
+ggplot(UCD_bud_dur_frt_prob, aes(x=bud.duration, y=UCD_Y1_Prob_Fruits, color=pop)) +
+  geom_jitter(height=0.01)
+
+UCD_bud_dur_prob_fruit <- glmer(UCD_Y1_Prob_Fruits ~ bud.duration + (1|pop),
+                                   data=UCD_bud_dur_frt_prob,
+                                   family=binomial)
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_prob_fruit) #not sig 
+Anova(UCD_bud_dur_prob_fruit)
+
+UCD_bud_dur_prob_fruit2 <- glmer(UCD_Y1_Prob_Fruits ~ bud.duration + (1|pop) + (1|block),
+                                   data=UCD_bud_dur_frt_prob,
+                                   family=binomial)
+#Warning: unable to evaluate scaled gradientWarning: Model failed to converge: degenerate  Hessian with 1 negative eigenvalues 
+summary(UCD_bud_dur_prob_fruit2) #not sig 
+```
+
+### Bud timing and survival to make at least one fruit at UCD
+```{r}
+init.repro %>% filter(site == "UCD")  %>% filter(!(is.na(bud.date_dt))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+UCD_bud_dt_frt_prob <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(pop %in% c("CP2", "FR", "SQ3", "WL2", "CC"))) #%>% #less than 3 indivs
+  #left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col")) #already in init_repro
+  
+ggplot(UCD_bud_dt_frt_prob, aes(x=bud.date_dt, y=UCD_Y1_Prob_Fruits, color=pop)) +
+  geom_jitter(height=0.01)
+  
+UCD_bud_dt_prob_fruit <- glmer(UCD_Y1_Prob_Fruits ~ bud.duration + (1|pop),
+                                   data=UCD_bud_dt_frt_prob,
+                                   family=binomial)
+summary(UCD_bud_dt_prob_fruit) #not sig 
+Anova(UCD_bud_dt_prob_fruit)
+
+UCD_bud_dt_prob_fruit2 <- glmer(UCD_Y1_Prob_Fruits ~ bud.duration + (1|pop) + (1|block),
+                                   data=UCD_bud_dt_frt_prob,
+                                   family=binomial)
+summary(UCD_bud_dt_prob_fruit2) #not sig 
 ```
 
 ## WL2 total fitness
 
 ```{r}
-WL2_total_fit <- WL2_total_fit %>%
-  rename(row=bed.row) %>%
-  rename(col=bed.col)
-
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(WL2_Total_Fitness))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 WL2_total_fit_bud_dur <- init.repro %>%
   filter(site == "WL2") %>%
-  left_join(WL2_total_fit %>% select(bed, row, col, Total_Fitness, logTotalFitness), by=c("bed", "row", "col")) %>%
-  filter(!(is.na(Total_Fitness))) %>%
+  filter(!(is.na(bud.duration))) %>% 
+  #left_join(WL2_total_fit %>% select(bed, row, col, Total_Fitness, logTotalFitness), by=c("bed", "row", "col")) %>% #already in init_repro
+  filter(!(is.na(WL2_Total_Fitness))) %>%
   filter(!(pop %in% c("SQ1", "WR")))
 
-ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=Total_Fitness, color=pop)) +
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=WL2_Total_Fitness, color=pop)) +
   geom_point()
 
-WL2_bud_dur_total_fit <- lmer(Total_Fitness ~ bud.duration + (1|pop),
+ggplot(WL2_total_fit_bud_dur, aes(x=WL2_Total_Fitness)) + #pretty skewed
+  geom_histogram()
+ggplot(WL2_total_fit_bud_dur, aes(x=log_WL2_Total_Fitness)) + #log transformation is better 
+  geom_histogram()
+
+WL2_bud_dur_total_fit <- lmer(log_WL2_Total_Fitness ~ bud.duration + (1|pop), #changed this to be the log of total fitness to make it more normal 
                               data=WL2_total_fit_bud_dur)
-summary(WL2_bud_dur_total_fit)
+summary(WL2_bud_dur_total_fit) #sig neg relat 
 Anova(WL2_bud_dur_total_fit)
+
+WL2_bud_dur_total_fit2 <- lmer(log_WL2_Total_Fitness ~ bud.duration + (1|pop) + (1|block), #changed this to be the log of total fitness to make it more normal 
+                              data=WL2_total_fit_bud_dur)
+summary(WL2_bud_dur_total_fit2) #relat no longer sig with block in the model
+Anova(WL2_bud_dur_total_fit2)
+
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=WL2_Total_Fitness, color=pop)) +
+  geom_point() +
+  facet_wrap(~block) #some blocks only have 1 or 2 individuals 
+WL2_total_fit_bud_dur %>% group_by(block) %>% summarise(n=n()) %>% arrange(n) #take blocks D and L out since less than 3 individuals
+
+WL2_total_fit_bud_dur_blocks <- WL2_total_fit_bud_dur %>% 
+  filter(block!="D", block!="L")
+
+WL2_bud_dur_total_fit3 <- lmer(log_WL2_Total_Fitness ~ bud.duration + (1|pop) + (1|block),
+                                   data=WL2_total_fit_bud_dur_blocks)
+summary(WL2_bud_dur_total_fit3) #relat still not sig 
+Anova(WL2_bud_dur_total_fit3)
 ```
 
 ```{r}
-ggplot(WL2_total_fit_bud_dur, aes(x=bud.date_dt, y=Total_Fitness, color=pop)) +
+init.repro %>% filter(site == "WL2")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(WL2_Total_Fitness))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
+
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.date_dt, y=WL2_Total_Fitness, color=pop)) +
   geom_point()
 
-WL2_dt_bud_total_fit <- lmer(Total_Fitness ~ bud.date_dt + (1|pop),
+WL2_dt_bud_total_fit <- lmer(log_WL2_Total_Fitness ~ bud.date_dt + (1|pop),
                               data=WL2_total_fit_bud_dur)
-summary(WL2_dt_bud_total_fit)
+summary(WL2_dt_bud_total_fit) #not sig 
 Anova(WL2_dt_bud_total_fit)
+
+WL2_dt_bud_total_fit2 <- lmer(log_WL2_Total_Fitness ~ bud.date_dt + (1|pop) + (1|block),
+                              data=WL2_total_fit_bud_dur)
+summary(WL2_dt_bud_total_fit2) #now a sig pos relat but coef is very small 
+Anova(WL2_dt_bud_total_fit2)
 ```
 
 ## Fruits/FrFLN ~ Phenology 
@@ -534,21 +624,27 @@ Note that fruit number is very skewed so these models are not usable.
 #1) include 0's but not NA's 
 #2) exclude NA's but use FrFlN - compare the fruit model to FrFlN model
 
+init.repro %>% filter(site == "UCD")  %>% filter(!(is.na(bud.duration))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 UCD_bud_fruit <- init.repro %>%
   filter(site == "UCD") %>%
   filter(!(is.na(Fruits))) %>%
+  mutate(logFruits=log(Fruits+1)) %>% 
   #filter(Fruits > 0) %>% #do we wannt to do this?
-  filter(!(is.na(bud.duration)))%>%
-  filter(pop != "SC")
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "TM2"))# %>% #only 2 pops with high enough sample size 
 
 UCD_bud_fruit %>% #very skewed 
   ggplot(aes(Fruits)) +
   geom_histogram()
+UCD_bud_fruit %>% #log transformation helps a little, but still not great 
+  ggplot(aes(logFruits)) +
+  geom_histogram()
+
 ggplot(UCD_bud_fruit, aes(x=bud.duration, y=Fruits, color=pop))+
   geom_point() #visually, generally the longer the bud duration, the more fruit but this is driven by TM2
 
 UCD_bud_dur_fruit <- lmer(Fruits ~ bud.duration + (1|pop),
-                          data=UCD_bud_fruit) #only TM2, DPR (although only 2 indiv) and BH in the model but multiple individuals from both (removed SC with only 1 individual that produced fruit)
+                          data=UCD_bud_fruit) #only TM2 and BH in the model but multiple individuals from both 
 #boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
 summary(UCD_bud_dur_fruit)
 Anova(UCD_bud_dur_fruit) #Significant relationship between bud duration and fruit number
@@ -557,7 +653,13 @@ UCD_bud_dur_fruit2 <- lmer(Fruits ~ bud.duration + (1|pop) + (1|block),
                           data=UCD_bud_fruit) 
 #boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
 summary(UCD_bud_dur_fruit2)
-Anova(UCD_bud_dur_fruit2) #Significant pos relationship between bud duration and fruit number w/ block in model
+Anova(UCD_bud_dur_fruit2) #marginal pos relationship between bud duration and fruit number w/ block in model
+
+UCD_bud_dur_fruit3 <- lmer(logFruits ~ bud.duration + (1|pop) + (1|block),
+                          data=UCD_bud_fruit) 
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_fruit3) #relat no longer sig
+Anova(UCD_bud_dur_fruit3) 
 
 #Testing fruit and flower number
 UCD_bud_dur_FrFlN <- lmer(FrFlw ~ bud.duration + (1|pop),
@@ -575,17 +677,14 @@ Anova(UCD_bud_dur_FrFlN2)
 
 ### Bud timing at UCD and number of fruits/FrFlN
 ```{r}
+init.repro %>% filter(site == "UCD")  %>% filter(!(is.na(bud.date_dt))) %>% filter(!(is.na(Fruits))) %>% group_by(pop) %>% summarise(n=n()) %>% arrange(n)
 UCD_dt_bud_fruit <- init.repro %>%
   filter(site == "UCD") %>%
   filter(!(is.na(Fruits))) %>%
+  mutate(logFruits=log(Fruits+1)) %>% 
   #filter(Fruits > 0) %>% #do we wannt to do this?
-  filter(!(is.na(bud.duration)))%>%
-  filter(pop != "SC")
-
-UCD_dt_bud_fruit <- UCD_dt_bud_fruit%>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(Fruits)))
-  #filter(fruits > 0)
+  filter(pop %in% c("BH", "TM2"))# %>% #only 2 pops with high enough sample size 
   
 ggplot(UCD_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
   geom_point()
@@ -597,12 +696,17 @@ Anova(UCD_bud_dt_fruit)
 
 UCD_bud_dt_fruit2 <- lmer(Fruits ~ bud.date_dt + (1|pop) + (1|block),
                           data=UCD_dt_bud_fruit) 
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
 summary(UCD_bud_dt_fruit2) #not sig
+
+UCD_bud_dt_fruit3 <- lmer(logFruits ~ bud.date_dt + (1|pop) + (1|block),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_fruit3) #not sig
 
 #Testing fruit and flower number
 UCD_bud_dt_FrFlN <- lmer(FrFlw ~ bud.date_dt + (1|pop),
                           data=UCD_dt_bud_fruit) 
-summary(UCD_bud_dt_FrFlN) #not sig
+summary(UCD_bud_dt_FrFlN) #marginally neg relat (small coef)
 Anova(UCD_bud_dt_FrFlN) 
 
 UCD_bud_dt_FrFlN2 <- lmer(FrFlw ~ bud.date_dt + (1|pop) + (1|block),
