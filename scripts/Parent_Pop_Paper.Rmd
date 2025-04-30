@@ -356,127 +356,6 @@ init.repro <- parent_pheno_duration %>%
 
 ```
 
-## Fruits/FrFLN ~ Phenology 
-
-### Bud duration at UCD and number of fruits/FrFlN
-
-```{r}
-#1) include 0's but not NA's 
-#2) exclude NA's but use FrFlN - compare the fruit model to FrFlN model
-
-UCD_bud_fruit <- UCD_bud_fruit %>%
-  filter(!(is.na(fruits))) %>%
-  #filter(fruits > 0) %>% #do we wannt to do this?
-  filter(!(is.na(bud.duration)))%>%
-  filter(pop != "SC")
-
-ggplot(UCD_bud_fruit, aes(x=bud.duration, y=fruits, color=pop))+
-  geom_point() #visually, generally the longer the bud duration, the more fruit but this is driven by TM2
-
-UCD_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
-                          data=UCD_bud_fruit) #only TM2, DPR (although only 2 indiv) and BH in the model but multiple individuals from both (removed SC with only 1 individual that produced fruit)
-summary(UCD_bud_dur_fruit)
-Anova(UCD_bud_dur_fruit) #Significant relationship between bud duration and fruit number
-
-#Testing fruit and flower number
-UCD_bud_dur_FrFlN <- lmer(FrFlN ~ bud.duration + (1|pop),
-                          data=UCD_bud_fruit)
-summary(UCD_bud_dur_FrFlN)
-Anova(UCD_bud_dur_FrFlN)
-```
-
-### Bud timing at UCD and number of fruits/FrFlN
-```{r}
-UCD_dt_bud_fruit <- UCD_dt_bud %>%
-  left_join(UCD_fruit %>% select(block, row, col, fruits, FrFlN), by=c("block", "row", "col")) 
-
-UCD_dt_bud_fruit <- UCD_dt_bud_fruit%>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(fruits)))
-  #filter(fruits > 0)
-  
-ggplot(UCD_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop)) +
-  geom_point()
-
-UCD_bud_dt_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
-                          data=UCD_dt_bud_fruit) 
-summary(UCD_bud_dt_fruit)
-Anova(UCD_bud_dt_fruit) 
-
-#Testing fruit and flower number
-UCD_bud_dt_FrFlN <- lmer(FrFlN ~ bud.date_dt + (1|pop),
-                          data=UCD_dt_bud_fruit) 
-summary(UCD_bud_dt_FrFlN)
-Anova(UCD_bud_dt_FrFlN) 
-```
-
-### Bud duration and fruit/FrFlN at WL2
-
-```{r}
-WL2_bud_fit <- init.repro %>%
-  filter(site == "WL2") %>%
-  left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>%
-  left_join(WL2_23_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>%
-  mutate(
-    fruits = coalesce(fruits.x, fruits.y),  # Combine fruits from both years
-    FrFlN = coalesce(FrFlN.x, FrFlN.y)    # Combine FrFlN from both years
-  ) %>%
-  select(-fruits.x, -fruits.y, -FrFlN.x, -FrFlN.y) 
-
-WL2_bud_dur_fit <- WL2_bud_fit %>%
-  filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(fruits)))
-
-ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=fruits, color=pop))+
-  geom_point()
-
-WL2_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
-                          data=WL2_bud_dur_fit)
-summary(WL2_bud_dur_fruit) #marginally negative relationship between bud duration and fruit number
-Anova(WL2_bud_dur_fruit)
-
-#testing with FrFlN
-WL2_bud_dur_FrFl <- WL2_bud_fit %>%
-  filter(!(is.na(bud.duration))) %>%
-  filter(!(is.na(FrFlN)))
-
-ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlN, color=pop))+
-  geom_point()
-
-WL2_bud_dur_FrFlN <- lmer(FrFlN ~ bud.duration + (1|pop),
-                          data=WL2_bud_dur_FrFl)
-summary(WL2_bud_dur_FrFlN) #marginally negative relationship between bud duration and fruit number
-Anova(WL2_bud_dur_FrFlN)
-```
-
-### Bud timing and fruit/FrFlN at WL2
-```{r}
-WL2_dt_bud_fruit <- WL2_bud_fit %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(fruits)))
-  
-ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop)) +
-  geom_point()
-
-WL2_bud_dt_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
-                          data=WL2_dt_bud_fruit) 
-summary(WL2_bud_dt_fruit)
-Anova(WL2_bud_dt_fruit) 
-
-#testing with FrFlN
-WL2_dt_bud_FrFl <- WL2_bud_fit %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(!(is.na(FrFlN)))
-
-ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=FrFlN, color=pop)) +
-  geom_point()
-
-WL2_bud_dt_FrFlN <- lmer(FrFlN ~ bud.date_dt + (1|pop),
-                          data=WL2_dt_bud_FrFl) 
-summary(WL2_bud_dt_FrFlN)
-Anova(WL2_bud_dt_FrFlN) 
-```
-
 ## Probability of making at least one fruit ~ Phenology 
 
 ### Bud duration and survival to make at least one fruit at WL2
@@ -644,6 +523,179 @@ WL2_dt_bud_total_fit <- lmer(Total_Fitness ~ bud.date_dt + (1|pop),
                               data=WL2_total_fit_bud_dur)
 summary(WL2_dt_bud_total_fit)
 Anova(WL2_dt_bud_total_fit)
+```
+
+## Fruits/FrFLN ~ Phenology 
+Note that fruit number is very skewed so these models are not usable.
+
+### Bud duration at UCD and number of fruits/FrFlN
+
+```{r}
+#1) include 0's but not NA's 
+#2) exclude NA's but use FrFlN - compare the fruit model to FrFlN model
+
+UCD_bud_fruit <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(Fruits))) %>%
+  #filter(Fruits > 0) %>% #do we wannt to do this?
+  filter(!(is.na(bud.duration)))%>%
+  filter(pop != "SC")
+
+UCD_bud_fruit %>% #very skewed 
+  ggplot(aes(Fruits)) +
+  geom_histogram()
+ggplot(UCD_bud_fruit, aes(x=bud.duration, y=Fruits, color=pop))+
+  geom_point() #visually, generally the longer the bud duration, the more fruit but this is driven by TM2
+
+UCD_bud_dur_fruit <- lmer(Fruits ~ bud.duration + (1|pop),
+                          data=UCD_bud_fruit) #only TM2, DPR (although only 2 indiv) and BH in the model but multiple individuals from both (removed SC with only 1 individual that produced fruit)
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_fruit)
+Anova(UCD_bud_dur_fruit) #Significant relationship between bud duration and fruit number
+
+UCD_bud_dur_fruit2 <- lmer(Fruits ~ bud.duration + (1|pop) + (1|block),
+                          data=UCD_bud_fruit) 
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_fruit2)
+Anova(UCD_bud_dur_fruit2) #Significant pos relationship between bud duration and fruit number w/ block in model
+
+#Testing fruit and flower number
+UCD_bud_dur_FrFlN <- lmer(FrFlw ~ bud.duration + (1|pop),
+                          data=UCD_bud_fruit)
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_FrFlN) #Significant relationship between bud duration and fruit + flower number
+Anova(UCD_bud_dur_FrFlN) 
+
+UCD_bud_dur_FrFlN2 <- lmer(FrFlw ~ bud.duration + (1|pop) + (1|block),
+                          data=UCD_bud_fruit)
+#boundary (singular) fit: see help('isSingular') b/c pop explains 0 var 
+summary(UCD_bud_dur_FrFlN2)  #Significant pos relationship between bud duration and fruit + flower number w/ block in model
+Anova(UCD_bud_dur_FrFlN2)
+```
+
+### Bud timing at UCD and number of fruits/FrFlN
+```{r}
+UCD_dt_bud_fruit <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(Fruits))) %>%
+  #filter(Fruits > 0) %>% #do we wannt to do this?
+  filter(!(is.na(bud.duration)))%>%
+  filter(pop != "SC")
+
+UCD_dt_bud_fruit <- UCD_dt_bud_fruit%>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(Fruits)))
+  #filter(fruits > 0)
+  
+ggplot(UCD_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
+  geom_point()
+
+UCD_bud_dt_fruit <- lmer(Fruits ~ bud.date_dt + (1|pop),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_fruit) #not sig
+Anova(UCD_bud_dt_fruit) 
+
+UCD_bud_dt_fruit2 <- lmer(Fruits ~ bud.date_dt + (1|pop) + (1|block),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_fruit2) #not sig
+
+#Testing fruit and flower number
+UCD_bud_dt_FrFlN <- lmer(FrFlw ~ bud.date_dt + (1|pop),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_FrFlN) #not sig
+Anova(UCD_bud_dt_FrFlN) 
+
+UCD_bud_dt_FrFlN2 <- lmer(FrFlw ~ bud.date_dt + (1|pop) + (1|block),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_FrFlN2) #not sig
+```
+
+### Bud duration and fruit/FrFlN at WL2
+
+```{r}
+WL2_bud_fit <- init.repro %>%
+  filter(site == "WL2") #%>%
+  #left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>% #already done in init.repo
+  #left_join(WL2_23_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>% #already done in init.repo
+ # mutate(  #already done in init.repo
+#    fruits = coalesce(fruits.x, fruits.y),  # Combine fruits from both years
+#    FrFlN = coalesce(FrFlN.x, FrFlN.y)    # Combine FrFlN from both years
+ # ) %>%
+ # select(-fruits.x, -fruits.y, -FrFlN.x, -FrFlN.y) 
+
+WL2_bud_fit %>% #very skewed 
+  ggplot(aes(Fruits)) +
+  geom_histogram()
+WL2_bud_dur_fit <- WL2_bud_fit %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(!(is.na(Fruits)))
+
+ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=Fruits, color=pop))+
+  geom_point()
+
+WL2_bud_dur_fruit <- lmer(Fruits ~ bud.duration + (1|pop),
+                          data=WL2_bud_dur_fit)
+summary(WL2_bud_dur_fruit) #sig negative relationship between bud duration and fruit number
+Anova(WL2_bud_dur_fruit)
+
+WL2_bud_dur_fruit2 <- lmer(Fruits ~ bud.duration + (1|pop) + (1|block),
+                          data=WL2_bud_dur_fit)
+summary(WL2_bud_dur_fruit2) #sig negative relationship between bud duration and fruit number
+
+#testing with FrFlN
+WL2_bud_dur_FrFl <- WL2_bud_fit %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(!(is.na(FrFlw)))
+
+ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlw, color=pop))+
+  geom_point()
+
+WL2_bud_dur_FrFlN <- lmer(FrFlw ~ bud.duration + (1|pop),
+                          data=WL2_bud_dur_FrFl)
+#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
+summary(WL2_bud_dur_FrFlN) #sig negative relationship between bud duration and fruit + flower number
+Anova(WL2_bud_dur_FrFlN)
+
+WL2_bud_dur_FrFlN2 <- lmer(FrFlw ~ bud.duration + (1|pop) + (1|block),
+                          data=WL2_bud_dur_FrFl)
+#boundary (singular) fit: see help('isSingular') b/c pop explains little variation 
+summary(WL2_bud_dur_FrFlN2) #sig negative relationship between bud duration and fruit + flower number
+```
+
+### Bud timing and fruit/FrFlN at WL2
+```{r}
+WL2_dt_bud_fruit <- WL2_bud_fit %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(Fruits)))
+  
+ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=Fruits, color=pop)) +
+  geom_point()
+
+WL2_bud_dt_fruit <- lmer(Fruits ~ bud.date_dt + (1|pop),
+                          data=WL2_dt_bud_fruit) 
+summary(WL2_bud_dt_fruit) #marginal pos relat 
+Anova(WL2_bud_dt_fruit) 
+
+WL2_bud_dt_fruit2 <- lmer(Fruits ~ bud.date_dt + (1|pop) + (1|block),
+                          data=WL2_dt_bud_fruit) 
+summary(WL2_bud_dt_fruit2) #relat now sig 
+
+#testing with FrFlN
+WL2_dt_bud_FrFl <- WL2_bud_fit %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(FrFlw)))
+
+ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=FrFlw, color=pop)) +
+  geom_point()
+
+WL2_bud_dt_FrFlN <- lmer(FrFlw ~ bud.date_dt + (1|pop),
+                          data=WL2_dt_bud_FrFl) 
+summary(WL2_bud_dt_FrFlN) #not sig 
+Anova(WL2_bud_dt_FrFlN) 
+
+WL2_bud_dt_FrFlN2 <- lmer(FrFlw ~ bud.date_dt + (1|pop) + (1|block),
+                          data=WL2_dt_bud_FrFl) 
+summary(WL2_bud_dt_FrFlN2) #relat now sig (pos)
 ```
 
 ## Rx norms for total repro duration and bud duration - only BH and TM2
