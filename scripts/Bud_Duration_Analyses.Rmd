@@ -1,0 +1,168 @@
+---
+title: "Bud_Duration_Analyses"
+output: html_document
+date: "2025-04-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(bbmle)
+library(googlesheets4)
+library(lmtest)
+library(car)
+library(lmerTest)
+```
+
+```{r}
+init.repro <- read_csv("../input/init.repro.csv")
+parent_pheno <- read_csv("../input/parent_pheno.csv")
+```
+
+#### Model: Does reproductive duration differ by site/elevation?
+
+```{r}
+#does budding duration differ by garden?
+bud_dur_int <- lmer(bud.duration ~ site*elev_m + (1|pop),
+                    data=init.repro)
+summary(bud_dur_int)
+Anova(bud_dur_int)
+
+bud_duration_site<- lmer(bud.duration ~ site + (1|pop),
+                     data=init.repro)
+summary(bud_duration_site)
+Anova(bud_duration_site)
+
+bud_duration_elev<- lmer(bud.duration ~ elev_m + (1|pop),
+                     data=init.repro)
+summary(bud_duration_elev)
+Anova(bud_duration_elev)
+
+ICtab(bud_dur_int, bud_duration_site, bud_duration_elev) #site fixed with random  pop is the best fit
+
+
+#Do we want to include year as a random effect because we have 2 years at WL2
+#Do we still see the same pattern removing WL2 2023 individuals?
+#test <- init.repro %>%
+  #filter(!(site == "WL2" & year == 23)) #want to see if having multiple WL2 years impacts the model - NO IT DOES NOT SO I WILL LEAVE IT IN
+#bud_test_no_23 <- lmer(bud.duration ~ site + (1|pop),
+ #                    data=test)
+#summary(bud_test_no_23)
+#Anova(bud_test_no_23)
+
+
+#does flowering duration differ by garden?
+flw_dur <- init.repro %>%
+  filter(!is.na(flower.duration)) #only include indiv that flowered
+         
+flw_dur_int <- lmer(flower.duration ~ site*elev_m + (1|pop),
+                    data=flw_dur)
+summary(flw_dur_int)
+Anova(flw_dur_int)
+
+flw_duration_site <- lmer(flower.duration ~ site + (1|pop),
+                          data=flw_dur)
+summary(flw_duration_site)
+Anova(flw_duration_site)
+
+ICtab(flw_dur_int, flw_duration_site) #just site as a fixed effect is the best fit
+
+#does fruiting duration differ by garden? 
+frt_duration_site <- lmer(fruit.duration ~ site + (1|pop),
+                          data=init.repro)
+Anova(frt_duration_site)
+
+#does total reproductive duration differ by garden?
+repro_duration_interaction <- lmer(total.repro.duration ~ site*elev_m + (1|pop) + (site|block),
+                       data=init.repro)
+summary(repro_duration_interaction)
+Anova(repro_duration_interaction)
+
+repro_duration_add <- lmer(total.repro.duration ~ site + elev_m + (1|pop) + (site|block),
+                       data=init.repro)
+summary(repro_duration_add)
+
+Anova(repro_duration_add)
+
+ICtab(repro_duration_interaction, repro_duration_add)
+
+```
+
+#### Calculating means and sem
+
+```{r}
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+repro_summary <- init.repro %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_repro = sum(!is.na(total.repro.duration)),
+            N_bud = sum(!is.na(bud.duration)),
+            mean_total_dur = mean(total.repro.duration, na.rm=(TRUE)),
+            sem_total_dur = sem(total.repro.duration, na.rm=(TRUE)),
+            mean_bud_dur = mean(bud.duration, na.rm=(TRUE)),
+            sem_bud_dur = sem(bud.duration, na.rm=(TRUE)),
+            mean_flw_dur = mean(flower.duration, na.rm=(TRUE)),
+            sem_flw_dur = sem(flower.duration, na.rm=(TRUE))
+            )
+```
+
+#### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
+
+```{r}
+init.repro %>%
+  filter(site == "WL2") %>%
+  ggplot(aes(x=bud.duration, fill=year)) +
+  geom_boxplot() +
+  facet_wrap(~pop)
+
+WL2_24_bud_dur <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+
+both_clim_dist_WL2_24 <- both_clim_dist_WL2_24 %>%
+  filter(TimePd == "Recent") 
+
+WL2_24_bud_dur <- WL2_24_bud_dur %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = elev_m)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_bud_dur_elev <- lmer(bud.duration ~ elev_m + (1|pop),
+                    data = WL2_24_bud_dur)
+summary(WL2_bud_dur_elev)
+Anova(WL2_bud_dur_elev) #Elevation is significant but latitude is not - seems like WL2 and YO7 are driving the significance bc they are higher elev pops with shorter durations
+
+WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
+                        data=WL2_24_bud_dur)
+summary(WL2_bud_dur_lat)
+Anova(WL2_bud_dur_lat)
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = GrwSsn_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_bud_dur_clim <- lmer(bud.duration ~ GrwSsn_GD + (1|pop),
+                         data=WL2_24_bud_dur)
+summary(WL2_bud_dur_clim)
+Anova(WL2_bud_dur_clim) #Clim dist is significant, TM2 might be driving this because it is farther and longer duration
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_bud_dur_wtr <- lmer(bud.duration ~ Wtr_Year_GD + (1|pop),
+                         data=WL2_24_bud_dur)
+summary(WL2_bud_dur_wtr)
+Anova(WL2_bud_dur_wtr) #Water year is significant, less similar has longer bud duration
+```

@@ -220,6 +220,8 @@ parent_pheno <- parent_pheno %>%
       !is.na(last.FL.date_dt), 
       1, 0
     ))
+
+write.csv(parent_pheno, "../input/parent_pheno.csv")
 ```
 
 #### Visualizing each repro duration across sites
@@ -325,78 +327,12 @@ lrtest(initiate_elev_null, initiate_elev)
 summary(initiate_elev)
 ```
 
-#### Model: Does reproductive duration differ by site/elevation?
-
 ```{r}
 #filter to only include individuals that initiated reproduction
 init.repro <- parent_pheno %>%
   filter(initiate.repro == 1)
 
 write.csv(init.repro, "../input/init.repro.csv")
-
-#does budding duration differ by garden?
-bud_dur_int <- lmer(bud.duration ~ site*elev_m + (1|pop),
-                    data=init.repro)
-summary(bud_dur_int)
-Anova(bud_dur_int)
-
-bud_duration_site<- lmer(bud.duration ~ site + (1|pop),
-                     data=init.repro)
-summary(bud_duration_site)
-Anova(bud_duration_site)
-
-bud_duration_elev<- lmer(bud.duration ~ elev_m + (1|pop),
-                     data=init.repro)
-summary(bud_duration_elev)
-Anova(bud_duration_elev)
-
-ICtab(bud_dur_int, bud_duration_site, bud_duration_elev) #site fixed with random  pop is the best fit
-
-
-#Do we want to include year as a random effect because we have 2 years at WL2
-#Do we still see the same pattern removing WL2 2023 individuals?
-#test <- init.repro %>%
-  #filter(!(site == "WL2" & year == 23)) #want to see if having multiple WL2 years impacts the model - NO IT DOES NOT SO I WILL LEAVE IT IN
-#bud_test_no_23 <- lmer(bud.duration ~ site + (1|pop),
- #                    data=test)
-#summary(bud_test_no_23)
-#Anova(bud_test_no_23)
-
-
-#does flowering duration differ by garden?
-flw_dur <- init.repro %>%
-  filter(!is.na(flower.duration)) #only include indiv that flowered
-         
-flw_dur_int <- lmer(flower.duration ~ site*elev_m + (1|pop),
-                    data=flw_dur)
-summary(flw_dur_int)
-Anova(flw_dur_int)
-
-flw_duration_site <- lmer(flower.duration ~ site + (1|pop),
-                          data=flw_dur)
-summary(flw_duration_site)
-Anova(flw_duration_site)
-
-ICtab(flw_dur_int, flw_duration_site) #just site as a fixed effect is the best fit
-
-#does fruiting duration differ by garden? 
-frt_duration_site <- lmer(fruit.duration ~ site + (1|pop),
-                          data=init.repro)
-Anova(frt_duration_site)
-
-#does total reproductive duration differ by garden?
-repro_duration_interaction <- lmer(total.repro.duration ~ site*elev_m + (1|pop) + (site|block),
-                       data=init.repro)
-summary(repro_duration_interaction)
-Anova(repro_duration_interaction)
-
-repro_duration_add <- lmer(total.repro.duration ~ site + elev_m + (1|pop) + (site|block),
-                       data=init.repro)
-summary(repro_duration_add)
-
-Anova(repro_duration_add)
-
-ICtab(repro_duration_interaction, repro_duration_add)
 
 ```
 
@@ -419,25 +355,6 @@ ICtab(repro_duration_interaction, repro_duration_add)
 
 ```
 
-#### Calculating means and sem
-
-```{r}
-sem <- function(x, na.rm=FALSE) {           #for calculating standard error
-  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
-} 
-repro_summary <- init.repro %>%
-  group_by(pop, site, elev_m) %>%
-  summarize(N_repro = sum(!is.na(total.repro.duration)),
-            N_bud = sum(!is.na(bud.duration)),
-            mean_total_dur = mean(total.repro.duration, na.rm=(TRUE)),
-            sem_total_dur = sem(total.repro.duration, na.rm=(TRUE)),
-            mean_bud_dur = mean(bud.duration, na.rm=(TRUE)),
-            sem_bud_dur = sem(bud.duration, na.rm=(TRUE)),
-            mean_flw_dur = mean(flower.duration, na.rm=(TRUE)),
-            sem_flw_dur = sem(flower.duration, na.rm=(TRUE))
-            )
-```
-
 #### Rx norms for total repro duration and bud duration - only BH and TM2
 
 ```{r}
@@ -456,157 +373,8 @@ repro_summary <- init.repro %>%
   #geom_errorbar(aes(ymin=mean_bud_dur-sem_bud_dur, ymax=mean_bud_dur+sem_bud_dur), width=0.1) 
 ```
 
-#### Model: Does days to budding differ by site/elevation?
-
-```{r}
-dt_bud <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
-               data=init.repro)
-summary(dt_bud)
-Anova(dt_bud) #THIS MAY BE PICKING UP THE POPS THAT ONLY BUDDED AT 1 OF THE GARDENS
-
-dt_flw <- lmer(flower.date_dt ~ site*elev_m + (1|pop),
-               data=init.repro)
-summary(dt_flw)
-Anova(dt_flw)
-
-#ONLY INCLUDING POPS THAT BUDDED AT BOTH GARDENS IN THE MODEL
-both_bud <- init.repro %>%
-  filter(pop %in% c("BH", "TM2", "CC", "SC"))
-
-dt_bud_both <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
-               data=both_bud)
-summary(dt_bud_both)
-Anova(dt_bud_both) #BH is the highest of the low elevation pops and has a slighlty steeper slope than the others which is probably what is driving this site*elevation interaction, elevation is now a significant predictor because BH is at a higher elevation than the others but that is because the high elevation pops are no longer considered
-
-dt_bud_both_site <- lmer(bud.date_dt ~ site + (1|pop),
-                         data=both_bud)
-summary(dt_bud_both_site)
-Anova(dt_bud_both_site)
-```
-
-#### Dt bud reaction norms
-
-```{r}
-dt_bud_summary <- init.repro %>%
-  group_by(pop, site, elev_m) %>%
-  summarize(N_bud = sum(!is.na(bud.date_dt)),
-            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
-            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE))
-            )
-
-dt_bud_summary %>%
-  filter(N_bud != 1) %>%
-  ggplot(aes(x=site, y=mean_dt_bud, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_dt_bud-sem_dt_bud, ymax=mean_dt_bud+sem_dt_bud), width=0.1) +
-  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
-```
-
-#### Scaling
-
-##### Check distributions - I'm not sure if log-transforming helped a whole log
-
-```{r}
-both_bud %>%
-  ggplot(aes(bud.date_dt, fill=site))+
-  geom_histogram() #skewed similar to height
-
-both_bud%>%
-  mutate(log_dt_bud = log(bud.date_dt)) %>%
-  ggplot(aes(log_dt_bud, fill=site)) +
-  geom_histogram() #still doesn't look exactly normally distributed but maybe better than before
-
-both_bud %>%
-  mutate(sqrt_dt_bud = sqrt(bud.date_dt)) %>%
-  ggplot(aes(sqrt_dt_bud, fill=site)) +
-  geom_histogram()
-
-init.repro %>%
-  ggplot(aes(bud.duration)) +
-  geom_histogram() #not too bad, maybe a slight skew
-
-init.repro %>%
-  mutate(log_bud_dur = log(bud.duration)) %>%
-  ggplot(aes(log_bud_dur)) +
-  geom_histogram() #idk if this made it any better
 
 
-
-
-scale_bud <- init.repro %>%
-  mutate(log_dt_bud = log(bud.date_dt)) %>%
-  mutate(sqrt_dt_bud =sqrt(bud.date_dt))
-
-
-scale_log_dt_bud <- lmer(log_dt_bud ~ site + (1|pop),
-                     data=scale_bud)
-
-summary(scale_dt_bud)
-Anova(scale_dt_bud)
-
-plot(scale_log_dt_bud, which = 1)
-qqnorm(resid(scale_log_dt_bud))
-qqline(resid(scale_log_dt_bud))
-
-
-#GAMMA distribution with log link - BAD!
-
-#scale_log_dt_bud_gamma <- glmer(bud.date_dt ~ site + #(1|pop),
-#                                family=Gamma(link="log"#),
-       #                         data=init.repro)
-#summary(scale_log_dt_bud_gamma)
-#Anova(scale_log_dt_bud_gamma)
-
-#predicted <- predict(scale_log_dt_bud_gamma, type = "response")
-#plot(dt.bud.scaled$bud.date_dt, predicted,
- #    xlab = "Observed", ylab = "Predicted",
-  #   main = "Observed vs. Predicted (Gamma GLMM)")
-#abline(0, 1, col = "red")
-
-
-
-#WEIBULL DISTRIBUTION???
-```
-
-##### Deviation from grand mean = dt bud - grand mean
-
-```{r}
-dt.bud.scaled <- init.repro %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  mutate(Grand_mean_dt_bud = mean(bud.date_dt)) %>%
-  mutate(Dev_grand_mean_dt_bud = (bud.date_dt - Grand_mean_dt_bud))
-
-both_bud_scaled <- dt.bud.scaled %>%
-  filter(pop %in% c("BH", "TM2", "CC", "SC"))
-
-dt_bud_both_site_scaled <- lmer(Dev_grand_mean_dt_bud ~ site + (1|pop),
-                         data=both_bud_scaled)
-summary(dt_bud_both_site_scaled)
-Anova(dt_bud_both_site_scaled)
-
-sem <- function(x, na.rm=FALSE) {           #for calculating standard error
-  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
-} 
-
-dt_bud_summary_scaled <- dt.bud.scaled %>%
-  group_by(pop, site, elev_m) %>%
-  summarize(N_bud = sum(!is.na(Dev_grand_mean_dt_bud)),
-            mean_dev_dt_bud = mean(Dev_grand_mean_dt_bud, na.rm=(TRUE)),
-            sem_dev_dt_bud = sem(Dev_grand_mean_dt_bud, na.rm=(TRUE))
-            )
-
-dt_bud_summary_scaled %>%
-  filter(N_bud != 1) %>%
-  ggplot(aes(x=site, y=mean_dev_dt_bud, group=pop, color=elev_m)) +
-  geom_point(size=1.5) +
-  geom_line(size=1) +
-  geom_errorbar(aes(ymin=mean_dev_dt_bud-sem_dev_dt_bud, ymax=mean_dev_dt_bud+sem_dev_dt_bud), width=0.1) +
-  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
-```
-
-```         
-```
 
 ```{r}
 #dt_flw_summary <- init.repro %>%
@@ -643,59 +411,6 @@ dt_bud_summary_scaled %>%
  # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
 
-#### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
-
-```{r}
-init.repro %>%
-  filter(site == "WL2") %>%
-  ggplot(aes(x=bud.duration, fill=year)) +
-  geom_boxplot() +
-  facet_wrap(~pop)
-
-WL2_24_bud_dur <- init.repro %>%
-  filter(site == "WL2") %>%
-  filter(year == 24) %>%
-  filter(!(is.na(bud.duration))) %>%
-  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
-
-both_clim_dist_WL2_24 <- both_clim_dist_WL2_24 %>%
-  filter(TimePd == "Recent") 
-
-WL2_24_bud_dur <- WL2_24_bud_dur %>%
-  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
-
-ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = elev_m)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-WL2_bud_dur_elev <- lmer(bud.duration ~ elev_m + (1|pop),
-                    data = WL2_24_bud_dur)
-summary(WL2_bud_dur_elev)
-Anova(WL2_bud_dur_elev) #Elevation is significant but latitude is not - seems like WL2 and YO7 are driving the significance bc they are higher elev pops with shorter durations
-
-WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
-                        data=WL2_24_bud_dur)
-summary(WL2_bud_dur_lat)
-Anova(WL2_bud_dur_lat)
-
-ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = GrwSsn_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-WL2_bud_dur_clim <- lmer(bud.duration ~ GrwSsn_GD + (1|pop),
-                         data=WL2_24_bud_dur)
-summary(WL2_bud_dur_clim)
-Anova(WL2_bud_dur_clim) #Clim dist is significant, TM2 might be driving this because it is farther and longer duration
-
-ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = Wtr_Year_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-WL2_bud_dur_wtr <- lmer(bud.duration ~ Wtr_Year_GD + (1|pop),
-                         data=WL2_24_bud_dur)
-summary(WL2_bud_dur_wtr)
-Anova(WL2_bud_dur_wtr) #Water year is significant, less similar has longer bud duration
-```
 
 #### Does flowering duration differ by pop at WL2?
 
@@ -771,77 +486,8 @@ summary(WL2_fr_dur_wtr_year)
 Anova(WL2_fr_dur_wtr_year)
 ```
 
-#### Dt bud at WL2 and climate distance
 
-```{r}
-WL2_24_dt_bud <- init.repro %>%
-  filter(site == "WL2") %>%
-  filter(year == 24) %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(!(pop %in% c("SQ1", "WR"))) %>%
-  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
 
-ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=elev_m)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-WL2_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
-                          data=WL2_24_dt_bud)
-summary(WL2_dt_bud_GrwSsn)
-Anova(WL2_dt_bud_GrwSsn)
-
-ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-WL2_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
-                          data=WL2_24_dt_bud)
-summary(WL2_dt_bud_WtrYr)
-Anova(WL2_dt_bud_WtrYr)
-```
-
-#### Dt bud at UCD and climate distance
-
-```{r}
-clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
-  rename(pop=parent.pop) %>%
-  rename(GrwSsn_GD=Gowers_Dist)%>%
-  filter(TimePd == "Recent")
-
-wtr_year_UCD <- wtr_year_UCD %>%
-  rename(pop=parent.pop) %>%
-  rename(Wtr_Year_GD=Gowers_Dist)%>%
-  filter(TimePd == "Recent")
-
-UCD_dt_bud <- init.repro %>%
-  filter(site == "UCD") %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  filter(pop %in% c("TM2", "BH", "CC", "DPR", "SC")) %>%
-  left_join(clim_dist_UCD22_23 %>% select(pop, GrwSsn_GD), by="pop") %>%
-  left_join(wtr_year_UCD %>% select(pop, Wtr_Year_GD), by="pop")
-
-ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-UCD_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
-                          data=UCD_dt_bud)
-summary(UCD_dt_bud_GrwSsn)
-Anova(UCD_dt_bud_GrwSsn)
-
-ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
-  geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
-
-UCD_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
-                          data=UCD_dt_bud)
-summary(UCD_dt_bud_WtrYr)
-Anova(UCD_dt_bud_WtrYr)
-```
 
 #### Bud duration and timing at UCD and number of fruits/FrFlN
 

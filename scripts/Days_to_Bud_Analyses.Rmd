@@ -1,0 +1,247 @@
+---
+title: "Days_to_Bud_Analyses"
+output: html_document
+date: "2025-04-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(bbmle)
+library(googlesheets4)
+library(lmtest)
+library(car)
+library(lmerTest)
+```
+
+```{r}
+init.repro <- read_csv("../input/init.repro.csv")
+parent_pheno <- read_csv("../input/parent_pheno.csv")
+```
+
+#### Model: Does days to budding differ by site/elevation?
+
+```{r}
+dt_bud <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
+               data=init.repro)
+summary(dt_bud)
+Anova(dt_bud) #THIS MAY BE PICKING UP THE POPS THAT ONLY BUDDED AT 1 OF THE GARDENS
+
+dt_flw <- lmer(flower.date_dt ~ site*elev_m + (1|pop),
+               data=init.repro)
+summary(dt_flw)
+Anova(dt_flw)
+
+#ONLY INCLUDING POPS THAT BUDDED AT BOTH GARDENS IN THE MODEL
+both_bud <- init.repro %>%
+  filter(pop %in% c("BH", "TM2", "CC", "SC"))
+
+dt_bud_both <- lmer(bud.date_dt ~ site*elev_m + (1|pop),
+               data=both_bud)
+summary(dt_bud_both)
+Anova(dt_bud_both) #BH is the highest of the low elevation pops and has a slighlty steeper slope than the others which is probably what is driving this site*elevation interaction, elevation is now a significant predictor because BH is at a higher elevation than the others but that is because the high elevation pops are no longer considered
+
+dt_bud_both_site <- lmer(bud.date_dt ~ site + (1|pop),
+                         data=both_bud)
+summary(dt_bud_both_site)
+Anova(dt_bud_both_site)
+```
+
+#### Dt bud reaction norms
+
+```{r}
+dt_bud_summary <- init.repro %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE))
+            )
+
+dt_bud_summary %>%
+  filter(N_bud != 1) %>%
+  ggplot(aes(x=site, y=mean_dt_bud, group=pop, color=elev_m)) +
+  geom_point(size=1.5) +
+  geom_line(size=1) +
+  geom_errorbar(aes(ymin=mean_dt_bud-sem_dt_bud, ymax=mean_dt_bud+sem_dt_bud), width=0.1) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+```
+
+#### Scaling
+
+##### Check distributions - I'm not sure if log-transforming helped a whole log
+
+```{r}
+both_bud %>%
+  ggplot(aes(bud.date_dt, fill=site))+
+  geom_histogram() #skewed similar to height
+
+both_bud%>%
+  mutate(log_dt_bud = log(bud.date_dt)) %>%
+  ggplot(aes(log_dt_bud, fill=site)) +
+  geom_histogram() #still doesn't look exactly normally distributed but maybe better than before
+
+both_bud %>%
+  mutate(sqrt_dt_bud = sqrt(bud.date_dt)) %>%
+  ggplot(aes(sqrt_dt_bud, fill=site)) +
+  geom_histogram()
+
+init.repro %>%
+  ggplot(aes(bud.duration)) +
+  geom_histogram() #not too bad, maybe a slight skew
+
+init.repro %>%
+  mutate(log_bud_dur = log(bud.duration)) %>%
+  ggplot(aes(log_bud_dur)) +
+  geom_histogram() #idk if this made it any better
+
+
+
+
+scale_bud <- init.repro %>%
+  mutate(log_dt_bud = log(bud.date_dt)) %>%
+  mutate(sqrt_dt_bud =sqrt(bud.date_dt))
+
+
+scale_log_dt_bud <- lmer(log_dt_bud ~ site + (1|pop),
+                     data=scale_bud)
+
+summary(scale_log_dt_bud)
+Anova(scale_log_dt_bud)
+
+plot(scale_log_dt_bud, which = 1)
+qqnorm(resid(scale_log_dt_bud))
+qqline(resid(scale_log_dt_bud))
+
+
+#GAMMA distribution with log link - BAD!
+
+#scale_log_dt_bud_gamma <- glmer(bud.date_dt ~ site + #(1|pop),
+#                                family=Gamma(link="log"#),
+       #                         data=init.repro)
+#summary(scale_log_dt_bud_gamma)
+#Anova(scale_log_dt_bud_gamma)
+
+#predicted <- predict(scale_log_dt_bud_gamma, type = "response")
+#plot(dt.bud.scaled$bud.date_dt, predicted,
+ #    xlab = "Observed", ylab = "Predicted",
+  #   main = "Observed vs. Predicted (Gamma GLMM)")
+#abline(0, 1, col = "red")
+
+
+
+#WEIBULL DISTRIBUTION???
+```
+
+##### Deviation from grand mean = dt bud - grand mean
+
+```{r}
+dt.bud.scaled <- init.repro %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  mutate(Grand_mean_dt_bud = mean(bud.date_dt)) %>%
+  mutate(Dev_grand_mean_dt_bud = (bud.date_dt - Grand_mean_dt_bud))
+
+both_bud_scaled <- dt.bud.scaled %>%
+  filter(pop %in% c("BH", "TM2", "CC", "SC"))
+
+dt_bud_both_site_scaled <- lmer(Dev_grand_mean_dt_bud ~ site + (1|pop),
+                         data=both_bud_scaled)
+summary(dt_bud_both_site_scaled)
+Anova(dt_bud_both_site_scaled)
+
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+
+dt_bud_summary_scaled <- dt.bud.scaled %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_bud = sum(!is.na(Dev_grand_mean_dt_bud)),
+            mean_dev_dt_bud = mean(Dev_grand_mean_dt_bud, na.rm=(TRUE)),
+            sem_dev_dt_bud = sem(Dev_grand_mean_dt_bud, na.rm=(TRUE))
+            )
+
+dt_bud_summary_scaled %>%
+  filter(N_bud != 1) %>%
+  ggplot(aes(x=site, y=mean_dev_dt_bud, group=pop, color=elev_m)) +
+  geom_point(size=1.5) +
+  geom_line(size=1) +
+  geom_errorbar(aes(ymin=mean_dev_dt_bud-sem_dev_dt_bud, ymax=mean_dev_dt_bud+sem_dev_dt_bud), width=0.1) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+```
+
+#### Dt bud at WL2 and climate distance
+
+```{r}
+WL2_24_dt_bud <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(pop %in% c("SQ1", "WR"))) %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=elev_m)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
+                          data=WL2_24_dt_bud)
+summary(WL2_dt_bud_GrwSsn)
+Anova(WL2_dt_bud_GrwSsn)
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
+                          data=WL2_24_dt_bud)
+summary(WL2_dt_bud_WtrYr)
+Anova(WL2_dt_bud_WtrYr)
+```
+
+#### Dt bud at UCD and climate distance
+
+```{r}
+clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
+  rename(pop=parent.pop) %>%
+  rename(GrwSsn_GD=Gowers_Dist)%>%
+  filter(TimePd == "Recent")
+
+wtr_year_UCD <- wtr_year_UCD %>%
+  rename(pop=parent.pop) %>%
+  rename(Wtr_Year_GD=Gowers_Dist)%>%
+  filter(TimePd == "Recent")
+
+UCD_dt_bud <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(pop %in% c("TM2", "BH", "CC", "DPR", "SC")) %>%
+  left_join(clim_dist_UCD22_23 %>% select(pop, GrwSsn_GD), by="pop") %>%
+  left_join(wtr_year_UCD %>% select(pop, Wtr_Year_GD), by="pop")
+
+ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+UCD_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
+                          data=UCD_dt_bud)
+summary(UCD_dt_bud_GrwSsn)
+Anova(UCD_dt_bud_GrwSsn)
+
+ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+UCD_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
+                          data=UCD_dt_bud)
+summary(UCD_dt_bud_WtrYr)
+Anova(UCD_dt_bud_WtrYr)
+```
