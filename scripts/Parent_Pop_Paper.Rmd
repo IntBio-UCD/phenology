@@ -21,15 +21,29 @@ library(lmerTest)
 ```
 
 ```{r}
+#Input Cleaned Common Garden Data
 UCD22_23 <- read_csv("../input/UCD22_23_transplant.csv")
-
 WL2_23 <- read_csv("../input/WL2_23.csv")
 WL2_24 <- read_csv("../input/WL2_24.csv")
 
+#Input Climate Distance Data
 clim_dist_UCD22_23 <- read_csv("../input/growthseason_GowersEnvtalDist_UCD.csv")
+wtr_year_UCD <- read_csv("../input/full_year_GowersEnvtalDist_UCD_wtr_year.csv")
 clim_dist_WL2_23 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2.csv")
-clim_dist_WL2_24 <- read_csv("../input/growthseason_GowersEnvtalDist_WL2_2024.csv")
+wtr_year_WL2_23 <- read_csv("../input/full_year_GowersEnvtalDist_WL2_wtr_year.csv")
+both_clim_dist_WL2_24 <- read_csv("../input/Gowers_WL2_2024.csv")
+
+#Input Fitness Data
+UCD_fruit <- read_csv("../input/UCD_Fruits.csv")
+WL2_24_fruit <- read_csv("../input/WL2_Fruits_Y2.csv")
+WL2_23_fruit <- read_csv("../input/WL2_Fruits_Y1.csv")
+WL2_24_frt_prob <- read_csv("../input/WL2_ProbFruits_Y2.csv")
+UCD_frt_prob <- read_csv("../input/ProbFruits_UCD.csv")
+WL2_prob_fit <- read_csv("../input/WL2_ProbFitness.csv")
+WL2_total_fit <- read_csv("../input/WL2_TotalRepOutput.csv")
 ```
+
+### Setting up data frame
 
 #### Select only the columns of interest and only parent pops from the WL2_24 garden
 
@@ -50,7 +64,7 @@ WL2_24 <- WL2_24 %>%
   select(block, bed, row, col, everything()) #reorder columns 
 ```
 
-#### Combine all gardens into one tibble, add a site column
+#### Combine all gardens into one tibble, add site and year columns
 
 ```{r}
 parent_pheno <- bind_rows(
@@ -66,12 +80,123 @@ parent_pheno <- parent_pheno %>%
 #### Add elevation and latitude data
 
 ```{r}
-clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
+both_clim_dist_WL2_24 <- both_clim_dist_WL2_24 %>%
   filter(TimePd == "Recent") %>%
   rename(pop=parent.pop)
 
 parent_pheno <- parent_pheno %>%
-  left_join(clim_dist_UCD22_23 %>% select(pop, elev_m, Lat), by="pop")
+  left_join(both_clim_dist_WL2_24 %>% select(pop, elev_m, Lat), by="pop")
+```
+
+#### Add recent climate distance - could have also added climate distance from fitness data csv
+
+```{r}
+clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop) %>%
+  rename(GrwSsn_GD=Gowers_Dist) %>%
+  mutate(site="UCD")
+
+wtr_year_UCD <- wtr_year_UCD %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop) %>%
+  rename(Wtr_Year_GD=Gowers_Dist) %>%
+  mutate(site="UCD")
+
+clim_dist_WL2_23 <- clim_dist_WL2_23 %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop) %>% 
+  rename(GrwSsn_GD=Gowers_Dist) %>%
+  mutate(site = "WL2") %>%
+  mutate(year= 23)
+
+wtr_year_WL2_23 <- wtr_year_WL2_23 %>%
+  filter(TimePd == "Recent") %>%
+  rename(pop=parent.pop) %>%
+  rename(Wtr_Year_GD=Gowers_Dist) %>%
+  mutate(site = "WL2") %>%
+  mutate(year=23)
+
+both_clim_dist_WL2_24 <- both_clim_dist_WL2_24 %>%
+  mutate(site = "WL2") %>%
+  mutate(year = 24)
+
+parent_pheno <- parent_pheno %>%
+  mutate(year = as.numeric(year)) %>%
+  left_join(clim_dist_UCD22_23 %>% select(pop, GrwSsn_GD, site), by = c("pop", "site")) %>%
+  left_join(wtr_year_UCD %>% select(pop, Wtr_Year_GD, site), by = c("pop", "site")) %>%
+  left_join(clim_dist_WL2_23 %>% select(pop, GrwSsn_GD, site, year), by = c("pop", "site", "year")) %>%
+  left_join(wtr_year_WL2_23 %>% select(pop, Wtr_Year_GD, site, year), by = c("pop", "site", "year")) %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, site, year, GrwSsn_GD, Wtr_Year_GD), by = c("pop", "site", "year")) %>%
+  mutate(
+    Grw_Ssn_GD = coalesce(GrwSsn_GD.x, GrwSsn_GD.y, GrwSsn_GD),
+    Wtr_Yr_GD = coalesce(Wtr_Year_GD.x, Wtr_Year_GD.y, Wtr_Year_GD)
+  ) %>%
+  select(-GrwSsn_GD.x, -GrwSsn_GD.y, -GrwSsn_GD, -Wtr_Year_GD.x, -Wtr_Year_GD.y, -Wtr_Year_GD)
+
+```
+
+#### Add fitness data
+
+```{r}
+#number of fruits made by each indiv at UCD
+UCD_fruit <- UCD_fruit %>%
+  mutate(site="UCD")
+
+#prob making a fruit in year 1 at UCD given survival to bolting
+UCD_frt_prob <- UCD_frt_prob %>%
+  mutate(site = "UCD") %>%
+  rename(UCD_Y1_Prob_Fruits=ProbFruits)
+
+#number of fruits made at WL2 in 2023
+WL2_23_fruit <- WL2_23_fruit %>%
+  mutate(site="WL2") %>%
+  mutate(year=23) %>%
+  rename(row='bed-row') %>%
+  rename(col='bed-col')
+
+#number of fruits made at WL2 in 2024
+WL2_24_fruit <- WL2_24_fruit %>%
+  mutate(site="WL2") %>%
+  mutate(year=24) 
+
+#prob making a fruit in year 2 at WL2 (given the indiv survived to bolting)
+WL2_24_frt_prob <- WL2_24_frt_prob %>%
+  mutate(site="WL2") %>%
+  mutate(year=24) %>%
+  rename(WL2_Y2_Prob_Fruits=ProbFruits)
+
+#prob of successfully reproducing - prob of making at least 1 fruit in year 1 or 2 at WL2
+WL2_prob_fit <- WL2_prob_fit %>%
+  rename(row=bed.row) %>%
+  rename(col=bed.col) %>%
+  rename(WL2_ProbFitness=ProbFitness) %>%
+  mutate(site="WL2")
+  
+#Total repro output - total fruit number across both years at WL2
+WL2_total_fit <- WL2_total_fit %>%
+  rename(row=bed.row) %>%
+  rename(col=bed.col) %>%
+  rename(WL2_Total_Fitness=Total_Fitness) %>%
+  rename(log_WL2_Total_Fitness=logTotalFitness) %>%
+  mutate(site="WL2")
+
+parent_pheno <- parent_pheno %>%
+  left_join(UCD_fruit %>% select(block, row, col, site, fruits, FrFlN), by=c("block", "row", "col", "site")) %>%
+  left_join(UCD_frt_prob %>% select(block, row, col, site, UCD_Y1_Prob_Fruits), by=c("block", "row", "col", "site")) %>%
+  left_join(WL2_23_fruit %>% select(bed, row, col, site, year, fruits, FrFlN), by=c("bed", "row", "col", "year", "site")) %>%
+  left_join(WL2_24_fruit %>% select(bed, row, col, site, year, fruits, FrFlN), by=c("bed", "row", "col", "year", "site")) %>%
+  left_join(WL2_24_frt_prob %>% select(bed, row, col, site, year, WL2_Y2_Prob_Fruits), by=c("bed", "row", "col", "year", "site")) %>%
+  left_join(WL2_prob_fit %>% select(bed, row, col, site, WL2_ProbFitness), by=c("bed", "row", "col", "site")) %>%
+  left_join(WL2_total_fit %>% select(bed, row, col, site, WL2_Total_Fitness, log_WL2_Total_Fitness), by=c("bed", "row", "col", "site")) %>%
+  mutate(
+    Fruits = coalesce(fruits.x, fruits.y, fruits),
+    FrFlw = coalesce(FrFlN.x, FrFlN.y, FrFlN)
+  ) %>%
+  select(-fruits.x, -fruits.y, -fruits, -FrFlN.x, -FrFlN.y, -FrFlN)
+  #at UCD some rows have a 0 for ProbFruits but nothing for fruit and/or frflw and also the opposite - do I need to make sure if there is a 0 in ProbFruits that there is also a 0 in fruits
+  #there are some cases where the plant has 0 fruits but the probability of making fruits is NA and not 0 because the plant might have still been alive by the last survey but not yet produced any fruits - what do I do here?
+#this is because ProbFruits was the probabiliyt of making a fruit given survival to bolting so individuals that were still alive but didn't initiate reproduction by the last survey had a fruit count of 0 but were not included in the ProbFruits calc.
 ```
 
 #### Calculate duration of each reproductive stage and add binary column for initiating reproduction
@@ -207,6 +332,8 @@ summary(initiate_elev)
 init.repro <- parent_pheno %>%
   filter(initiate.repro == 1)
 
+write.csv(init.repro, "../input/init.repro.csv")
+
 #does budding duration differ by garden?
 bud_dur_int <- lmer(bud.duration ~ site*elev_m + (1|pop),
                     data=init.repro)
@@ -274,21 +401,21 @@ ICtab(repro_duration_interaction, repro_duration_add)
 ```
 
 ```{r}
-ggplot(init.repro, aes(x=site, y=total.repro.duration, color=elev_m)) +
-  geom_point() +
-  geom_smooth(method="lm", aes(group=elev_m))
+#ggplot(init.repro, aes(x=site, y=total.repro.duration, color=elev_m)) +
+ # geom_point() +
+ # geom_smooth(method="lm", aes(group=elev_m))
 
-ggplot(init.repro, aes(x=site, y=bud.duration, color=elev_m)) +
-  geom_point() +
-  geom_smooth(method="lm", aes(group=elev_m))
+#ggplot(init.repro, aes(x=site, y=bud.duration, color=elev_m)) +
+ # geom_point() +
+  #geom_smooth(method="lm", aes(group=elev_m))
 
-ggplot(init.repro, aes(x=site, y=flower.duration, color=elev_m)) +
-  geom_point() +
-  geom_smooth(method="lm", aes(group=elev_m))
+#ggplot(init.repro, aes(x=site, y=flower.duration, color=elev_m)) +
+ # geom_point() +
+  #geom_smooth(method="lm", aes(group=elev_m))
 
-ggplot(init.repro, aes(x=site, y=fruit.duration, color=elev_m)) +
-  geom_point() +
-  geom_smooth(method="lm", aes(group=elev_m))
+#ggplot(init.repro, aes(x=site, y=fruit.duration, color=elev_m)) +
+ # geom_point() +
+  #geom_smooth(method="lm", aes(group=elev_m))
 
 ```
 
@@ -376,6 +503,111 @@ dt_bud_summary %>%
   scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
 
+#### Scaling
+
+##### Check distributions - I'm not sure if log-transforming helped a whole log
+
+```{r}
+both_bud %>%
+  ggplot(aes(bud.date_dt, fill=site))+
+  geom_histogram() #skewed similar to height
+
+both_bud%>%
+  mutate(log_dt_bud = log(bud.date_dt)) %>%
+  ggplot(aes(log_dt_bud, fill=site)) +
+  geom_histogram() #still doesn't look exactly normally distributed but maybe better than before
+
+both_bud %>%
+  mutate(sqrt_dt_bud = sqrt(bud.date_dt)) %>%
+  ggplot(aes(sqrt_dt_bud, fill=site)) +
+  geom_histogram()
+
+init.repro %>%
+  ggplot(aes(bud.duration)) +
+  geom_histogram() #not too bad, maybe a slight skew
+
+init.repro %>%
+  mutate(log_bud_dur = log(bud.duration)) %>%
+  ggplot(aes(log_bud_dur)) +
+  geom_histogram() #idk if this made it any better
+
+
+
+
+scale_bud <- init.repro %>%
+  mutate(log_dt_bud = log(bud.date_dt)) %>%
+  mutate(sqrt_dt_bud =sqrt(bud.date_dt))
+
+
+scale_log_dt_bud <- lmer(log_dt_bud ~ site + (1|pop),
+                     data=scale_bud)
+
+summary(scale_dt_bud)
+Anova(scale_dt_bud)
+
+plot(scale_log_dt_bud, which = 1)
+qqnorm(resid(scale_log_dt_bud))
+qqline(resid(scale_log_dt_bud))
+
+
+#GAMMA distribution with log link - BAD!
+
+#scale_log_dt_bud_gamma <- glmer(bud.date_dt ~ site + #(1|pop),
+#                                family=Gamma(link="log"#),
+       #                         data=init.repro)
+#summary(scale_log_dt_bud_gamma)
+#Anova(scale_log_dt_bud_gamma)
+
+#predicted <- predict(scale_log_dt_bud_gamma, type = "response")
+#plot(dt.bud.scaled$bud.date_dt, predicted,
+ #    xlab = "Observed", ylab = "Predicted",
+  #   main = "Observed vs. Predicted (Gamma GLMM)")
+#abline(0, 1, col = "red")
+
+
+
+#WEIBULL DISTRIBUTION???
+```
+
+##### Deviation from grand mean = dt bud - grand mean
+
+```{r}
+dt.bud.scaled <- init.repro %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  mutate(Grand_mean_dt_bud = mean(bud.date_dt)) %>%
+  mutate(Dev_grand_mean_dt_bud = (bud.date_dt - Grand_mean_dt_bud))
+
+both_bud_scaled <- dt.bud.scaled %>%
+  filter(pop %in% c("BH", "TM2", "CC", "SC"))
+
+dt_bud_both_site_scaled <- lmer(Dev_grand_mean_dt_bud ~ site + (1|pop),
+                         data=both_bud_scaled)
+summary(dt_bud_both_site_scaled)
+Anova(dt_bud_both_site_scaled)
+
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+
+dt_bud_summary_scaled <- dt.bud.scaled %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_bud = sum(!is.na(Dev_grand_mean_dt_bud)),
+            mean_dev_dt_bud = mean(Dev_grand_mean_dt_bud, na.rm=(TRUE)),
+            sem_dev_dt_bud = sem(Dev_grand_mean_dt_bud, na.rm=(TRUE))
+            )
+
+dt_bud_summary_scaled %>%
+  filter(N_bud != 1) %>%
+  ggplot(aes(x=site, y=mean_dev_dt_bud, group=pop, color=elev_m)) +
+  geom_point(size=1.5) +
+  geom_line(size=1) +
+  geom_errorbar(aes(ymin=mean_dev_dt_bud-sem_dev_dt_bud, ymax=mean_dev_dt_bud+sem_dev_dt_bud), width=0.1) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+```
+
+```         
+```
+
 ```{r}
 #dt_flw_summary <- init.repro %>%
  # group_by(pop, site, elev_m) %>%
@@ -391,6 +623,7 @@ dt_bud_summary %>%
  # geom_line(size=1) +
  # geom_errorbar(aes(ymin=mean_dt_flw-sem_dt_flw, ymax=mean_dt_flw+sem_dt_flw), width=0.1) +
  # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+
 ```
 
 ```{r}
@@ -425,12 +658,11 @@ WL2_24_bud_dur <- init.repro %>%
   filter(!(is.na(bud.duration))) %>%
   filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
 
-clim_dist_WL2_24 <- clim_dist_WL2_24 %>%
-  filter(TimePd == "Recent") %>%
-  rename(pop=parent.pop)
+both_clim_dist_WL2_24 <- both_clim_dist_WL2_24 %>%
+  filter(TimePd == "Recent") 
 
 WL2_24_bud_dur <- WL2_24_bud_dur %>%
-  left_join(clim_dist_WL2_24 %>% select(pop, Gowers_Dist), by="pop")
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
 
 ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = elev_m)) +
   geom_boxplot() +
@@ -446,14 +678,23 @@ WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
 summary(WL2_bud_dur_lat)
 Anova(WL2_bud_dur_lat)
 
-ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = Gowers_Dist)) +
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = GrwSsn_GD)) +
   geom_boxplot() +
   scale_fill_gradient(low = "#F5A540", high = "#0043F0")
 
-WL2_bud_dur_clim <- lmer(bud.duration ~ Gowers_Dist + (1|pop),
+WL2_bud_dur_clim <- lmer(bud.duration ~ GrwSsn_GD + (1|pop),
                          data=WL2_24_bud_dur)
 summary(WL2_bud_dur_clim)
 Anova(WL2_bud_dur_clim) #Clim dist is significant, TM2 might be driving this because it is farther and longer duration
+
+ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_bud_dur_wtr <- lmer(bud.duration ~ Wtr_Year_GD + (1|pop),
+                         data=WL2_24_bud_dur)
+summary(WL2_bud_dur_wtr)
+Anova(WL2_bud_dur_wtr) #Water year is significant, less similar has longer bud duration
 ```
 
 #### Does flowering duration differ by pop at WL2?
@@ -463,7 +704,8 @@ WL2_24_flw_dur <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(flower.duration))) %>%
-  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
 
 ggplot(WL2_24_flw_dur, aes(x=flower.duration))+
   geom_boxplot()+
@@ -478,6 +720,18 @@ WL2_flw_dur_lat <- lmer(flower.duration ~ Lat + (1|pop),
                         data=WL2_24_flw_dur)
 summary(WL2_flw_dur_lat)
 Anova(WL2_flw_dur_lat) #not significant
+
+
+#Testing climate distance - not significant for either
+WL2_flw_dur_grw_ssn <- lmer(flower.duration ~ GrwSsn_GD + (1|pop),
+                            data=WL2_24_flw_dur)
+summary(WL2_flw_dur_grw_ssn)
+Anova(WL2_flw_dur_grw_ssn)
+
+WL2_flw_dur_wtr_year <- lmer(flower.duration ~ Wtr_Year_GD + (1|pop),
+                            data=WL2_24_flw_dur)
+summary(WL2_flw_dur_wtr_year)
+Anova(WL2_flw_dur_wtr_year)
 ```
 
 #### Does fruiting duration differ by pop at WL2?
@@ -487,7 +741,8 @@ WL2_24_fr_dur <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(fruit.duration))) %>%
-  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
 
 ggplot(WL2_24_fr_dur, aes(x=fruit.duration))+
   geom_boxplot()+
@@ -502,4 +757,373 @@ WL2_fr_dur_lat <- lmer(fruit.duration ~ Lat + (1|pop),
                         data=WL2_24_fr_dur)
 summary(WL2_fr_dur_lat)
 Anova(WL2_fr_dur_lat) #neither elevation nor lat is significant
+
+
+#Testing climate distance - not significant for either
+WL2_fr_dur_grw_ssn <- lmer(fruit.duration ~ GrwSsn_GD + (1|pop),
+                            data=WL2_24_fr_dur)
+summary(WL2_fr_dur_grw_ssn)
+Anova(WL2_fr_dur_grw_ssn)
+
+WL2_fr_dur_wtr_year <- lmer(fruit.duration ~ Wtr_Year_GD + (1|pop),
+                            data=WL2_24_fr_dur)
+summary(WL2_fr_dur_wtr_year)
+Anova(WL2_fr_dur_wtr_year)
+```
+
+#### Dt bud at WL2 and climate distance
+
+```{r}
+WL2_24_dt_bud <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(pop %in% c("SQ1", "WR"))) %>%
+  left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=elev_m)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
+                          data=WL2_24_dt_bud)
+summary(WL2_dt_bud_GrwSsn)
+Anova(WL2_dt_bud_GrwSsn)
+
+ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
+                          data=WL2_24_dt_bud)
+summary(WL2_dt_bud_WtrYr)
+Anova(WL2_dt_bud_WtrYr)
+```
+
+#### Dt bud at UCD and climate distance
+
+```{r}
+clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
+  rename(pop=parent.pop) %>%
+  rename(GrwSsn_GD=Gowers_Dist)%>%
+  filter(TimePd == "Recent")
+
+wtr_year_UCD <- wtr_year_UCD %>%
+  rename(pop=parent.pop) %>%
+  rename(Wtr_Year_GD=Gowers_Dist)%>%
+  filter(TimePd == "Recent")
+
+UCD_dt_bud <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(pop %in% c("TM2", "BH", "CC", "DPR", "SC")) %>%
+  left_join(clim_dist_UCD22_23 %>% select(pop, GrwSsn_GD), by="pop") %>%
+  left_join(wtr_year_UCD %>% select(pop, Wtr_Year_GD), by="pop")
+
+ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+UCD_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
+                          data=UCD_dt_bud)
+summary(UCD_dt_bud_GrwSsn)
+Anova(UCD_dt_bud_GrwSsn)
+
+ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
+  geom_boxplot() +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+
+UCD_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
+                          data=UCD_dt_bud)
+summary(UCD_dt_bud_WtrYr)
+Anova(UCD_dt_bud_WtrYr)
+```
+
+#### Bud duration and timing at UCD and number of fruits/FrFlN
+
+```{r}
+#1) include 0's but not NA's 
+#2) exclude NA's but use FrFlN - compare the fruit model to FrFlN model
+
+UCD_bud_fruit <- UCD_bud_fruit %>%
+  filter(!(is.na(fruits))) %>%
+  #filter(fruits > 0) %>% #do we wannt to do this?
+  filter(!(is.na(bud.duration)))%>%
+  filter(pop != "SC")
+
+ggplot(UCD_bud_fruit, aes(x=bud.duration, y=fruits, color=pop))+
+  geom_point() #visually, generally the longer the bud duration, the more fruit but this is driven by TM2
+
+UCD_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
+                          data=UCD_bud_fruit) #only TM2, DPR (although only 2 indiv) and BH in the model but multiple individuals from both (removed SC with only 1 individual that produced fruit)
+summary(UCD_bud_dur_fruit)
+Anova(UCD_bud_dur_fruit) #Significant relationship between bud duration and fruit number
+
+#Testing fruit and flower number
+UCD_bud_dur_FrFlN <- lmer(FrFlN ~ bud.duration + (1|pop),
+                          data=UCD_bud_fruit)
+summary(UCD_bud_dur_FrFlN)
+Anova(UCD_bud_dur_FrFlN)
+
+UCD_dt_bud_fruit <- UCD_dt_bud %>%
+  left_join(UCD_fruit %>% select(block, row, col, fruits, FrFlN), by=c("block", "row", "col")) 
+
+UCD_dt_bud_fruit <- UCD_dt_bud_fruit%>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(fruits)))
+  #filter(fruits > 0)
+  
+ggplot(UCD_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop)) +
+  geom_point()
+
+UCD_bud_dt_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_fruit)
+Anova(UCD_bud_dt_fruit) 
+
+#Testing fruit and flower number
+UCD_bud_dt_FrFlN <- lmer(FrFlN ~ bud.date_dt + (1|pop),
+                          data=UCD_dt_bud_fruit) 
+summary(UCD_bud_dt_FrFlN)
+Anova(UCD_bud_dt_FrFlN) 
+```
+
+#### Bud duration and fruit/FrFlN at WL2
+
+```{r}
+
+WL2_bud_fit <- init.repro %>%
+  filter(site == "WL2") %>%
+  left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>%
+  left_join(WL2_23_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>%
+  mutate(
+    fruits = coalesce(fruits.x, fruits.y),  # Combine fruits from both years
+    FrFlN = coalesce(FrFlN.x, FrFlN.y)    # Combine FrFlN from both years
+  ) %>%
+  select(-fruits.x, -fruits.y, -FrFlN.x, -FrFlN.y) 
+
+WL2_bud_dur_fit <- WL2_bud_fit %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(!(is.na(fruits)))
+
+ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=fruits, color=pop))+
+  geom_point()
+
+WL2_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
+                          data=WL2_bud_dur_fit)
+summary(WL2_bud_dur_fruit) #marginally negative relationship between bud duration and fruit number
+Anova(WL2_bud_dur_fruit)
+
+
+
+WL2_dt_bud_fruit <- WL2_bud_fit %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(fruits)))
+  
+ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop)) +
+  geom_point()
+
+WL2_bud_dt_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
+                          data=WL2_dt_bud_fruit) 
+summary(WL2_bud_dt_fruit)
+Anova(WL2_bud_dt_fruit) 
+
+
+
+#testing with FrFlN
+WL2_bud_dur_FrFl <- WL2_bud_fit %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(!(is.na(FrFlN)))
+
+ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlN, color=pop))+
+  geom_point()
+
+WL2_bud_dur_FrFlN <- lmer(fruits ~ bud.duration + (1|pop),
+                          data=WL2_bud_dur_FrFl)
+summary(WL2_bud_dur_FrFlN) #marginally negative relationship between bud duration and fruit number
+Anova(WL2_bud_dur_FrFlN)
+
+
+WL2_dt_bud_FrFl <- WL2_bud_fit %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(is.na(FrFlN)))
+
+ggplot(WL2_dt_bud_FrFl, aes(x=bud.date_dt, y=fruits, color=pop)) +
+  geom_point()
+
+WL2_bud_dt_FrFlN <- lmer(fruits ~ bud.date_dt + (1|pop),
+                          data=WL2_dt_bud_FrFl) 
+summary(WL2_bud_dt_FrFlN)
+Anova(WL2_bud_dt_FrFlN) 
+```
+
+#### Bud duration and timing and survival to make a fruit at WL2
+
+```{r}
+
+
+WL2_bud_dur_frt_prob <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) %>%
+  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
+  
+ggplot(WL2_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
+  geom_jitter(height=0.01)
+
+WL2_24_bud_dur_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
+                                   data=WL2_bud_dur_frt_prob,
+                                   family=binomial)
+summary(WL2_24_bud_dur_prob_fruit)
+Anova(WL2_24_bud_dur_prob_fruit)
+
+#could calculate mean prob of making fruit and mean bud duration for each pop - but lose indiv variation
+WL2_bud_dur_mean_frt_prob <- WL2_bud_dt_frt_prob %>%
+  group_by(pop) %>%
+  summarize(mean_frt_prob = mean(ProbFruits, na.rm=TRUE),
+            sem_frt_prob = sem(ProbFruits, na.rm=TRUE),
+            mean_bud_dur = mean(bud.duration, na.rm=TRUE),
+            sem_bud_dur= sem(bud.duration, na.rm=TRUE)) %>%
+  ungroup()
+
+ggplot(WL2_bud_dur_mean_frt_prob, aes(x=mean_bud_dur, y=mean_frt_prob, color=pop))+
+  geom_point()
+
+mean_frt_prob_reg <- glm(mean_frt_prob ~ mean_bud_dur,
+                         family=gaussian(),
+                         data= WL2_bud_dur_mean_frt_prob)
+summary(mean_frt_prob_reg)
+Anova(mean_frt_prob_reg)
+
+
+WL2_bud_dt_frt_prob <- init.repro %>%
+  filter(site == "WL2") %>%
+  filter(year == 24) %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(pop %in% c("SQ1", "WR"))) %>%
+  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
+  
+ggplot(WL2_bud_dt_frt_prob, aes(x=bud.date_dt, y=ProbFruits, color=pop)) +
+  geom_jitter(height=0.01)
+  
+WL2_24_bud_dt_prob_fruit <- glmer(ProbFruits ~ bud.date_dt + (1|pop),
+                                   data=WL2_bud_dt_frt_prob,
+                                   family=binomial)
+summary(WL2_24_bud_dt_prob_fruit)
+Anova(WL2_24_bud_dt_prob_fruit)
+```
+
+#### Bud duration and survival to make a fruit at UCD
+
+```{r}
+
+UCD_bud_dur_frt_prob <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.duration))) %>%
+  filter(pop %in% c("BH", "TM2")) %>%
+  left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col"))
+  
+ggplot(UCD_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
+  geom_jitter(height=0.01)
+
+UCD_bud_dur_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
+                                   data=UCD_bud_dur_frt_prob,
+                                   family=binomial)
+summary(UCD_bud_dur_prob_fruit)
+Anova(UCD_bud_dur_prob_fruit)
+
+
+UCD_bud_dt_frt_prob <- init.repro %>%
+  filter(site == "UCD") %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  filter(!(pop %in% c("CP2", "FR", "SQ3", "WL2"))) %>%
+  left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col"))
+  
+ggplot(UCD_bud_dt_frt_prob, aes(x=bud.date_dt, y=ProbFruits, color=pop)) +
+  geom_jitter(height=0.01)
+  
+UCD_bud_dt_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
+                                   data=UCD_bud_dt_frt_prob,
+                                   family=binomial)
+summary(UCD_bud_dt_prob_fruit)
+Anova(UCD_bud_dt_prob_fruit)
+```
+
+#### Both WL2 years and probability of successfully reproducing
+
+```{r}
+
+
+WL2_prob_fit <- WL2_prob_fit %>%
+  rename(row=bed.row) %>%
+  rename(col=bed.col)
+
+all_WL2_fit_prob_bud_dur <- init.repro %>%
+  filter(site == "WL2")  %>%
+  filter(!(is.na(bud.duration))) %>%
+  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) %>%
+  filter(!(pop %in% c("SQ1", "WR")))
+
+ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=ProbFitness, color=pop)) +
+  geom_jitter(height=0.01)
+
+prob_fit_bud_dur <- glmer(ProbFitness ~ bud.duration + (1|pop),
+                                   data=all_WL2_fit_prob_bud_dur,
+                                   family=binomial)
+summary(prob_fit_bud_dur)
+Anova(prob_fit_bud_dur)
+plogis(fixef(prob_fit_bud_dur)) #Back transforming/Inverse Logit of the fixed effect coefficients
+
+all_WL2_fit_prob_dt_bud <- init.repro %>%
+  filter(site == "WL2")  %>%
+  filter(!(is.na(bud.date_dt))) %>%
+  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) #%>%
+  #filter(!(pop %in% c("SQ1", "WR")))
+
+ggplot(all_WL2_fit_prob_dt_bud, aes(x=bud.date_dt, y=ProbFitness, color=pop)) +
+  geom_jitter(height=0.01)
+
+prob_fit_dt_bud <- glmer(ProbFitness ~ bud.date_dt + (1|pop),
+                                   data=all_WL2_fit_prob_dt_bud,
+                                   family=binomial)
+summary(prob_fit_dt_bud)
+Anova(prob_fit_dt_bud)
+```
+
+#### WL2 total fitness
+
+```{r}
+
+
+WL2_total_fit <- WL2_total_fit %>%
+  rename(row=bed.row) %>%
+  rename(col=bed.col)
+
+WL2_total_fit_bud_dur <- init.repro %>%
+  filter(site == "WL2") %>%
+  left_join(WL2_total_fit %>% select(bed, row, col, Total_Fitness, logTotalFitness), by=c("bed", "row", "col")) %>%
+  filter(!(is.na(Total_Fitness))) %>%
+  filter(!(pop %in% c("SQ1", "WR")))
+
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=Total_Fitness, color=pop)) +
+  geom_point()
+
+WL2_bud_dur_total_fit <- lmer(Total_Fitness ~ bud.duration + (1|pop),
+                              data=WL2_total_fit_bud_dur)
+summary(WL2_bud_dur_total_fit)
+Anova(WL2_bud_dur_total_fit)
+
+
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.date_dt, y=Total_Fitness, color=pop)) +
+  geom_point()
+
+WL2_dt_bud_total_fit <- lmer(Total_Fitness ~ bud.date_dt + (1|pop),
+                              data=WL2_total_fit_bud_dur)
+summary(WL2_dt_bud_total_fit)
+Anova(WL2_dt_bud_total_fit)
 ```
