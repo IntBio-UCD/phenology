@@ -329,10 +329,10 @@ initiate_elev <- glm(initiate.repro ~ elev_m,
 initiate_elev_null <- glm(initiate.repro ~ 1,
                           data=parent_pheno_duration,
                           family=binomial())
-lrtest(initiate_elev_null, initiate_elev) 
+#lrtest(initiate_elev_null, initiate_elev) 
 #Error in lrtest.default(initiate_elev_null, initiate_elev) : 
   #models were not all fitted to the same size of dataset
-summary(initiate_elev)
+#summary(initiate_elev)
 ```
 
 ### Filter to only include individuals that initiated reproduction
