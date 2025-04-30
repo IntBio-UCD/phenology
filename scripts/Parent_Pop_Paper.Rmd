@@ -646,7 +646,7 @@ summary(WL2_dt_bud_total_fit)
 Anova(WL2_dt_bud_total_fit)
 ```
 
-#### Rx norms for total repro duration and bud duration - only BH and TM2
+## Rx norms for total repro duration and bud duration - only BH and TM2
 
 ```{r, eval=FALSE}
 #repro_summary %>%
@@ -700,7 +700,7 @@ Anova(WL2_dt_bud_total_fit)
 ```
 
 
-#### Does flowering duration differ by pop at WL2?
+## Does flowering duration differ by pop at WL2?
 Not a high enough sample size/variation to do this analysis 
 ```{r, eval=FALSE}
 WL2_24_flw_dur <- init.repro %>%
@@ -737,7 +737,7 @@ summary(WL2_flw_dur_wtr_year)
 Anova(WL2_flw_dur_wtr_year)
 ```
 
-#### Does fruiting duration differ by pop at WL2?
+## Does fruiting duration differ by pop at WL2?
 Not a high enough sample size/variation to do this analysis 
 ```{r, eval=FALSE}
 WL2_24_fr_dur <- init.repro %>%
