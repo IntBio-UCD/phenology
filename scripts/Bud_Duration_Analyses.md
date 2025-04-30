@@ -6,34 +6,202 @@ output:
 date: "2025-04-08"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+
+
+
+``` r
+library(dplyr)
 ```
 
-```{r}
-library(dplyr)
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+``` r
 library(tidyverse)
+```
+
+```
+## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ✔ forcats   1.0.0     ✔ readr     2.1.5
+## ✔ ggplot2   3.5.1     ✔ stringr   1.5.1
+## ✔ lubridate 1.9.3     ✔ tibble    3.2.1
+## ✔ purrr     1.0.2     ✔ tidyr     1.3.1
+```
+
+```
+## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()
+## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+```
+
+``` r
 library(lubridate)
 library(lme4)
+```
+
+```
+## Loading required package: Matrix
+## 
+## Attaching package: 'Matrix'
+## 
+## The following objects are masked from 'package:tidyr':
+## 
+##     expand, pack, unpack
+```
+
+``` r
 library(bbmle)
+```
+
+```
+## Loading required package: stats4
+## 
+## Attaching package: 'bbmle'
+## 
+## The following object is masked from 'package:dplyr':
+## 
+##     slice
+```
+
+``` r
 library(googlesheets4)
 library(lmtest)
-library(car)
-library(lmerTest)
+```
 
+```
+## Loading required package: zoo
+## 
+## Attaching package: 'zoo'
+## 
+## The following objects are masked from 'package:base':
+## 
+##     as.Date, as.Date.numeric
+```
+
+``` r
+library(car)
+```
+
+```
+## Loading required package: carData
+## 
+## Attaching package: 'car'
+## 
+## The following object is masked from 'package:purrr':
+## 
+##     some
+## 
+## The following object is masked from 'package:dplyr':
+## 
+##     recode
+```
+
+``` r
+library(lmerTest)
+```
+
+```
+## 
+## Attaching package: 'lmerTest'
+## 
+## The following object is masked from 'package:lme4':
+## 
+##     lmer
+## 
+## The following object is masked from 'package:stats':
+## 
+##     step
+```
+
+``` r
 sem <- function(x, na.rm=FALSE) {           #for caclulating standard error
   sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
 } 
 ```
 
-```{r}
+
+``` r
 init.repro <- read_csv("../input/init.repro.csv")
+```
+
+```
+## New names:
+## Rows: 179 Columns: 31
+## ── Column specification
+## ──────────────────────────────────────────────────────── Delimiter: "," chr
+## (5): block, bed, col, pop, site dbl (26): ...1, row, mf, rep, bud.date_dt,
+## flower.date_dt, fruit.date_dt, la...
+## ℹ Use `spec()` to retrieve the full column specification for this data. ℹ
+## Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## • `` -> `...1`
+```
+
+``` r
 parent_pheno <- read_csv("../input/parent_pheno.csv")
 ```
 
+```
+## New names:
+## Rows: 2491 Columns: 31
+## ── Column specification
+## ──────────────────────────────────────────────────────── Delimiter: "," chr
+## (5): block, bed, col, pop, site dbl (25): ...1, row, mf, rep, bud.date_dt,
+## flower.date_dt, fruit.date_dt, la... lgl (1): WL2_Y2_Prob_Fruits
+## ℹ Use `spec()` to retrieve the full column specification for this data. ℹ
+## Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## • `` -> `...1`
+```
+
 ## Check Distribution 
-```{r}
+
+``` r
 init.repro %>% filter(!is.na(bud.duration)) %>% group_by(pop, site) %>% summarise(n=n()) 
+```
+
+```
+## `summarise()` has grouped output by 'pop'. You can override using the `.groups`
+## argument.
+```
+
+```
+## # A tibble: 16 × 3
+## # Groups:   pop [12]
+##    pop   site      n
+##    <chr> <chr> <int>
+##  1 BH    UCD      15
+##  2 BH    WL2      20
+##  3 CC    WL2      10
+##  4 CP2   UCD       1
+##  5 DPR   UCD       2
+##  6 IH    WL2      18
+##  7 SC    UCD       1
+##  8 SC    WL2      11
+##  9 SQ1   WL2       1
+## 10 SQ3   UCD       1
+## 11 TM2   UCD      14
+## 12 TM2   WL2      32
+## 13 WL2   UCD       1
+## 14 WL2   WL2       4
+## 15 WR    WL2       1
+## 16 YO7   WL2      16
+```
+
+``` r
 #ONLY INCLUDING POPS THAT BUDDED AT BOTH GARDENS IN THE MODEL
 both_bud_duration <- init.repro %>%
   filter(pop %in% c("BH", "TM2")) #SC and WL2 only have 1 indiv at UCD 
@@ -41,27 +209,72 @@ both_bud_duration <- init.repro %>%
 both_bud_duration %>% 
   ggplot(aes(bud.duration, fill=site))+
   geom_histogram() #skewed
+```
 
+```
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+```
+## Warning: Removed 11 rows containing non-finite outside the scale range
+## (`stat_bin()`).
+```
+
+![](Bud_Duration_Analyses_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+``` r
 both_bud_duration%>%
   mutate(log_bud.duration = log(bud.duration)) %>%
   ggplot(aes(log_bud.duration, fill=site)) +
   geom_histogram()
+```
 
+```
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+```
+## Warning: Removed 11 rows containing non-finite outside the scale range
+## (`stat_bin()`).
+```
+
+![](Bud_Duration_Analyses_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
+
+``` r
 both_bud_duration%>%
   mutate(log_bud.duration = log(bud.duration)) %>%
   ggplot(aes(log_bud.duration)) +
   geom_histogram()
 ```
 
+```
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+```
+## Warning: Removed 11 rows containing non-finite outside the scale range
+## (`stat_bin()`).
+```
+
+![](Bud_Duration_Analyses_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
+
 ## Bud duration Reaction norm
-```{r}
+
+``` r
 bud.duration_summary <- both_bud_duration %>%
 group_by(pop, site, elev_m) %>%
 summarize(N_bud = sum(!is.na(bud.duration)),
           mean_bud.duration = mean(bud.duration, na.rm=(TRUE)),
           sem_bud.duration = sem(bud.duration, na.rm=(TRUE))
           )
+```
 
+```
+## `summarise()` has grouped output by 'pop', 'site'. You can override using the
+## `.groups` argument.
+```
+
+``` r
 bud.duration_summary %>%
   filter(N_bud != 1) %>%
   ggplot(aes(x=site, y=mean_bud.duration, group=pop, color=elev_m)) +
@@ -71,10 +284,21 @@ bud.duration_summary %>%
   scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
 
+```
+## Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+## ℹ Please use `linewidth` instead.
+## This warning is displayed once every 8 hours.
+## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
+## generated.
+```
+
+![](Bud_Duration_Analyses_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+
 
 #### Model: Does reproductive duration differ by site/elevation?
 
-```{r, eval=FALSE}
+
+``` r
 #does budding duration differ by garden?
 bud_dur_int <- lmer(bud.duration ~ site*elev_m + (1|pop),
                     data=init.repro)
@@ -138,12 +362,12 @@ summary(repro_duration_add)
 Anova(repro_duration_add)
 
 ICtab(repro_duration_interaction, repro_duration_add)
-
 ```
 
 #### Calculating means and sem
 
-```{r}
+
+``` r
 sem <- function(x, na.rm=FALSE) {           #for calculating standard error
   sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
 } 
@@ -160,9 +384,15 @@ repro_summary <- init.repro %>%
             )
 ```
 
+```
+## `summarise()` has grouped output by 'pop', 'site'. You can override using the
+## `.groups` argument.
+```
+
 #### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
 
-```{r, eval=FALSE}
+
+``` r
 init.repro %>%
   filter(site == "WL2") %>%
   ggplot(aes(x=bud.duration, fill=year)) +
