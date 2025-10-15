@@ -373,9 +373,6 @@ write.csv(init.repro, "../input/init.repro.csv")
   #geom_errorbar(aes(ymin=mean_bud_dur-sem_bud_dur, ymax=mean_bud_dur+sem_bud_dur), width=0.1) 
 ```
 
-
-
-
 ```{r}
 #dt_flw_summary <- init.repro %>%
  # group_by(pop, site, elev_m) %>%
@@ -410,7 +407,6 @@ write.csv(init.repro, "../input/init.repro.csv")
  # geom_errorbar(aes(ymin=mean_dt_fr-sem_dt_fr, ymax=mean_dt_fr+sem_dt_fr), width=0.1) +
  # scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 ```
-
 
 #### Does flowering duration differ by pop at WL2?
 
@@ -486,18 +482,21 @@ summary(WL2_fr_dur_wtr_year)
 Anova(WL2_fr_dur_wtr_year)
 ```
 
-
-#### Bud duration and timing at UCD and number of fruits/FrFlN
+#### Bud duration and timing at UCD and number of fruits/FrFlN (only TM2, DPR, and BH had more than 1 individual with fruit/FrFlN)
 
 ```{r}
 #1) include 0's but not NA's 
 #2) exclude NA's but use FrFlN - compare the fruit model to FrFlN model
 
+UCD_bud_fruit <- init.repro %>%
+  filter(site=="UCD") %>%
+ left_join(UCD_fruit %>% select(block, row, col, fruits, FrFlN), by=c("block", "row", "col")) 
+
 UCD_bud_fruit <- UCD_bud_fruit %>%
   filter(!(is.na(fruits))) %>%
   #filter(fruits > 0) %>% #do we wannt to do this?
   filter(!(is.na(bud.duration)))%>%
-  filter(pop != "SC")
+  filter(!(pop %in% c("SC", "CP2", "SQ3", "WL2")))
 
 ggplot(UCD_bud_fruit, aes(x=bud.duration, y=fruits, color=pop))+
   geom_point() #visually, generally the longer the bud duration, the more fruit but this is driven by TM2
@@ -507,13 +506,22 @@ UCD_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
 summary(UCD_bud_dur_fruit)
 Anova(UCD_bud_dur_fruit) #Significant relationship between bud duration and fruit number
 
+ggplot(UCD_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop))+
+  geom_point() #visually, more fruits were produced when budding started earlier although tthis could be driven by TM2 as well
+
+UCD_dt_bud_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
+                         data=UCD_bud_fruit)
+summary(UCD_dt_bud_fruit)
+Anova(UCD_dt_bud_fruit)
+
 #Testing fruit and flower number
 UCD_bud_dur_FrFlN <- lmer(FrFlN ~ bud.duration + (1|pop),
                           data=UCD_bud_fruit)
 summary(UCD_bud_dur_FrFlN)
 Anova(UCD_bud_dur_FrFlN)
 
-UCD_dt_bud_fruit <- UCD_dt_bud %>%
+UCD_dt_bud_fruit <- init.repro %>%
+  filter(site=="UCD") %>%
   left_join(UCD_fruit %>% select(block, row, col, fruits, FrFlN), by=c("block", "row", "col")) 
 
 UCD_dt_bud_fruit <- UCD_dt_bud_fruit%>%
@@ -539,7 +547,6 @@ Anova(UCD_bud_dt_FrFlN)
 #### Bud duration and fruit/FrFlN at WL2
 
 ```{r}
-
 WL2_bud_fit <- init.repro %>%
   filter(site == "WL2") %>%
   left_join(WL2_24_fruit %>% select(bed, row, col, fruits, FrFlN), by=c("bed", "row", "col")) %>%
@@ -557,11 +564,15 @@ WL2_bud_dur_fit <- WL2_bud_fit %>%
 ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=fruits, color=pop))+
   geom_point()
 
+ggplot(WL2_bud_dur_fit, aes(x=bud.duration, y=fruits, color=elev_m))+
+  geom_point() +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(x="Bud Duration", y="Fruit Number")
+
 WL2_bud_dur_fruit <- lmer(fruits ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_fit)
 summary(WL2_bud_dur_fruit) #marginally negative relationship between bud duration and fruit number
 Anova(WL2_bud_dur_fruit)
-
 
 
 WL2_dt_bud_fruit <- WL2_bud_fit %>%
@@ -571,11 +582,15 @@ WL2_dt_bud_fruit <- WL2_bud_fit %>%
 ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=pop)) +
   geom_point()
 
+ggplot(WL2_dt_bud_fruit, aes(x=bud.date_dt, y=fruits, color=elev_m))+
+  geom_point() +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(x="Days to bud", y="Fruit Number")
+
 WL2_bud_dt_fruit <- lmer(fruits ~ bud.date_dt + (1|pop),
                           data=WL2_dt_bud_fruit) 
 summary(WL2_bud_dt_fruit)
 Anova(WL2_bud_dt_fruit) 
-
 
 
 #testing with FrFlN
@@ -588,7 +603,7 @@ ggplot(WL2_bud_dur_FrFl, aes(x=bud.duration, y=FrFlN, color=pop))+
 
 WL2_bud_dur_FrFlN <- lmer(fruits ~ bud.duration + (1|pop),
                           data=WL2_bud_dur_FrFl)
-summary(WL2_bud_dur_FrFlN) #marginally negative relationship between bud duration and fruit number
+summary(WL2_bud_dur_FrFlN) # negative relationship between bud duration and fruit number
 Anova(WL2_bud_dur_FrFlN)
 
 
@@ -605,26 +620,74 @@ summary(WL2_bud_dt_FrFlN)
 Anova(WL2_bud_dt_FrFlN) 
 ```
 
+```{r}
+bud_seq <- seq(min(WL2_bud_dur_fit$bud.duration, na.rm = TRUE),
+               max(WL2_bud_dur_fit$bud.duration, na.rm = TRUE))
+
+newdata <- data.frame(bud.duration = bud_seq)
+
+newdata$predicted <- predict(WL2_bud_dur_fruit, newdata = newdata, re.form = NA)
+
+ggplot(WL2_bud_dur_fit, aes(x = bud.duration, y = fruits, color = elev_m)) +
+  geom_point(alpha = 0.7) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata, aes(x = bud.duration, y = predicted), color = "blue", size = 1.2) +
+  labs(x = "Bud Duration", y = "Fruit Number")
+
+dt_bud_seq <- seq(min(WL2_dt_bud_fruit$bud.date_dt, na.rm = TRUE),
+                  max(WL2_dt_bud_fruit$bud.date_dt, na.rm = TRUE))
+
+newdata_dt <- data.frame(bud.date_dt = dt_bud_seq)
+
+newdata_dt$predicted <- predict(WL2_bud_dt_fruit, newdata = newdata_dt, re.form = NA)
+
+ggplot(WL2_dt_bud_fruit, aes(x = bud.date_dt, y = fruits, color = elev_m)) +
+  geom_point(alpha = 0.8) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata_dt, aes(x = bud.date_dt, y = predicted),
+            color = "blue", size = 1.2, inherit.aes = FALSE) +
+  labs(x = "Days to bud", y = "Fruit Number")
+
+```
+
 #### Bud duration and timing and survival to make a fruit at WL2
 
 ```{r}
-
-
 WL2_bud_dur_frt_prob <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7")) %>%
-  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
-  
-ggplot(WL2_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
-  geom_jitter(height=0.01)
+  filter(pop %in% c("BH", "CC", "IH", "SC", "TM2", "WL2", "YO7"))
 
-WL2_24_bud_dur_prob_fruit <- glmer(ProbFruits ~ bud.duration + (1|pop),
+  
+ggplot(WL2_bud_dur_frt_prob, aes(x=bud.duration, y=WL2_Y2_Prob_Fruits, color=elev_m)) +
+  geom_jitter(height=0.01) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_24_bud_dur_prob_fruit <- glmer(WL2_Y2_Prob_Fruits ~ bud.duration + (1|pop),
                                    data=WL2_bud_dur_frt_prob,
                                    family=binomial)
 summary(WL2_24_bud_dur_prob_fruit)
 Anova(WL2_24_bud_dur_prob_fruit)
+
+bud_seq <- seq(min(WL2_bud_dur_frt_prob$bud.duration, na.rm = TRUE),
+               max(WL2_bud_dur_frt_prob$bud.duration, na.rm = TRUE))
+
+newdata <- data.frame(bud.duration = bud_seq)
+
+newdata$predicted <- predict(WL2_24_bud_dur_prob_fruit,
+                             newdata = newdata,
+                             type = "response",
+                             re.form = NA)
+
+ggplot(WL2_bud_dur_frt_prob, aes(x = bud.duration, y = WL2_Y2_Prob_Fruits, color = elev_m)) +
+  geom_jitter(height = 0.01, alpha = 0.8) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata, aes(x = bud.duration, y = predicted),
+            inherit.aes = FALSE,
+            color = "blue", size = 1.2) +
+  labs(x = "Bud Duration", y = "Survival to Fruiting")
+
 
 #could calculate mean prob of making fruit and mean bud duration for each pop - but lose indiv variation
 WL2_bud_dur_mean_frt_prob <- WL2_bud_dt_frt_prob %>%
@@ -649,17 +712,35 @@ WL2_bud_dt_frt_prob <- init.repro %>%
   filter(site == "WL2") %>%
   filter(year == 24) %>%
   filter(!(is.na(bud.date_dt))) %>%
-  filter(!(pop %in% c("SQ1", "WR"))) %>%
-  left_join(WL2_24_frt_prob %>% select(bed, row, col, ProbFruits), by=c("bed", "row", "col"))
+  filter(!(pop %in% c("SQ1", "WR")))
   
-ggplot(WL2_bud_dt_frt_prob, aes(x=bud.date_dt, y=ProbFruits, color=pop)) +
-  geom_jitter(height=0.01)
+ggplot(WL2_bud_dt_frt_prob, aes(x=bud.date_dt, y=WL2_Y2_Prob_Fruits, color=elev_m)) +
+  geom_jitter(height=0.01) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
   
-WL2_24_bud_dt_prob_fruit <- glmer(ProbFruits ~ bud.date_dt + (1|pop),
+WL2_24_bud_dt_prob_fruit <- glmer(WL2_Y2_Prob_Fruits ~ bud.date_dt + (1|pop),
                                    data=WL2_bud_dt_frt_prob,
                                    family=binomial)
 summary(WL2_24_bud_dt_prob_fruit)
 Anova(WL2_24_bud_dt_prob_fruit)
+
+dt_bud_seq <- seq(min(WL2_bud_dt_frt_prob$bud.date_dt, na.rm = TRUE),
+                  max(WL2_bud_dt_frt_prob$bud.date_dt, na.rm = TRUE))
+
+newdata2 <- data.frame(bud.date_dt = dt_bud_seq)
+
+newdata2$predicted <- predict(WL2_24_bud_dt_prob_fruit,
+                              newdata = newdata2,
+                              type = "response",
+                              re.form = NA)
+
+ggplot(WL2_bud_dt_frt_prob, aes(x = bud.date_dt, y = WL2_Y2_Prob_Fruits, color = elev_m)) +
+  geom_jitter(height = 0.01, alpha = 0.8) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata2, aes(x = bud.date_dt, y = predicted),
+            inherit.aes = FALSE,
+            color = "blue", size = 1.2) +
+  labs(x = "Days to Bud", y = "Survival to Fruiting")
 ```
 
 #### Bud duration and survival to make a fruit at UCD
@@ -669,8 +750,7 @@ Anova(WL2_24_bud_dt_prob_fruit)
 UCD_bud_dur_frt_prob <- init.repro %>%
   filter(site == "UCD") %>%
   filter(!(is.na(bud.duration))) %>%
-  filter(pop %in% c("BH", "TM2")) %>%
-  left_join(UCD_frt_prob %>% select(block, row, col, ProbFruits), by=c("block", "row", "col"))
+  filter(pop %in% c("BH", "TM2"))
   
 ggplot(UCD_bud_dur_frt_prob, aes(x=bud.duration, y=ProbFruits, color=pop)) +
   geom_jitter(height=0.01)
@@ -702,7 +782,6 @@ Anova(UCD_bud_dt_prob_fruit)
 
 ```{r}
 
-
 WL2_prob_fit <- WL2_prob_fit %>%
   rename(row=bed.row) %>%
   rename(col=bed.col)
@@ -710,57 +789,106 @@ WL2_prob_fit <- WL2_prob_fit %>%
 all_WL2_fit_prob_bud_dur <- init.repro %>%
   filter(site == "WL2")  %>%
   filter(!(is.na(bud.duration))) %>%
-  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) %>%
+  #left_join(WL2_prob_fit %>% select(bed, row, col, WL2_ProbFitness), by=c("bed", "row", "col")) %>%
   filter(!(pop %in% c("SQ1", "WR")))
 
-ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=ProbFitness, color=pop)) +
-  geom_jitter(height=0.01)
+ggplot(all_WL2_fit_prob_bud_dur, aes(x=bud.duration, y=WL2_ProbFitness, color=elev_m)) +
+  geom_jitter(height=0.01) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
 
-prob_fit_bud_dur <- glmer(ProbFitness ~ bud.duration + (1|pop),
+prob_fit_bud_dur <- glmer(WL2_ProbFitness ~ bud.duration + (1|pop),
                                    data=all_WL2_fit_prob_bud_dur,
                                    family=binomial)
 summary(prob_fit_bud_dur)
 Anova(prob_fit_bud_dur)
 plogis(fixef(prob_fit_bud_dur)) #Back transforming/Inverse Logit of the fixed effect coefficients
 
+bud_dur_seq <- seq(min(all_WL2_fit_prob_bud_dur$bud.duration, na.rm = TRUE),
+                   max(all_WL2_fit_prob_bud_dur$bud.duration, na.rm = TRUE))
+newdata_pred <- data.frame(bud.duration = bud_dur_seq)
+newdata_pred$predicted <- predict(prob_fit_bud_dur,
+                                   newdata = newdata_pred,
+                                   type = "response",
+                                   re.form = NA)
+
+ggplot(all_WL2_fit_prob_bud_dur, aes(x = bud.duration, y = WL2_ProbFitness, color = elev_m)) +
+  geom_jitter(height = 0.01, alpha = 0.8) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata_pred, aes(x = bud.duration, y = predicted),
+            inherit.aes = FALSE,
+            color = "blue", size = 1.2) +
+  labs(x = "Bud Duration", y = "Probability of Making 1+ Fruits")
+
+
 all_WL2_fit_prob_dt_bud <- init.repro %>%
   filter(site == "WL2")  %>%
-  filter(!(is.na(bud.date_dt))) %>%
-  left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) #%>%
+  filter(!(is.na(bud.date_dt)))
+  #left_join(WL2_prob_fit %>% select(bed, row, col, ProbFitness), by=c("bed", "row", "col")) #%>%
   #filter(!(pop %in% c("SQ1", "WR")))
 
-ggplot(all_WL2_fit_prob_dt_bud, aes(x=bud.date_dt, y=ProbFitness, color=pop)) +
+ggplot(all_WL2_fit_prob_dt_bud, aes(x=bud.date_dt, y=WL2_ProbFitness, color=pop)) +
   geom_jitter(height=0.01)
 
-prob_fit_dt_bud <- glmer(ProbFitness ~ bud.date_dt + (1|pop),
+prob_fit_dt_bud <- glmer(WL2_ProbFitness ~ bud.date_dt + (1|pop),
                                    data=all_WL2_fit_prob_dt_bud,
                                    family=binomial)
 summary(prob_fit_dt_bud)
 Anova(prob_fit_dt_bud)
+
+bud_dt_seq <- seq(min(all_WL2_fit_prob_bud_dur$bud.date_dt, na.rm = TRUE),
+                   max(all_WL2_fit_prob_bud_dur$bud.date_dt, na.rm = TRUE))
+newdata_pred2 <- data.frame(bud.date_dt = bud_dt_seq)
+newdata_pred2$predicted <- predict(prob_fit_dt_bud,
+                                   newdata = newdata_pred2,
+                                   type = "response",
+                                   re.form = NA)
+
+ggplot(all_WL2_fit_prob_bud_dur, aes(x = bud.date_dt, y = WL2_ProbFitness, color = elev_m)) +
+  geom_jitter(height = 0.01, alpha = 0.8) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata_pred2, aes(x = bud.date_dt, y = predicted),
+            inherit.aes = FALSE,
+            color = "blue", size = 1.2) +
+  labs(x = "Days to bud", y = "Probability of Making 1+ Fruits")
 ```
 
-#### WL2 total fitness
+#### WL2 total fitness - idk if we need this
 
 ```{r}
-
-
 WL2_total_fit <- WL2_total_fit %>%
   rename(row=bed.row) %>%
   rename(col=bed.col)
 
 WL2_total_fit_bud_dur <- init.repro %>%
   filter(site == "WL2") %>%
-  left_join(WL2_total_fit %>% select(bed, row, col, Total_Fitness, logTotalFitness), by=c("bed", "row", "col")) %>%
-  filter(!(is.na(Total_Fitness))) %>%
+  #left_join(WL2_total_fit %>% select(bed, row, col, WL2_Total_Fitness, logTotalFitness), by=c("bed", "row", "col")) %>%
+  filter(!(is.na(WL2_Total_Fitness))) %>%
   filter(!(pop %in% c("SQ1", "WR")))
 
-ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=Total_Fitness, color=pop)) +
+ggplot(WL2_total_fit_bud_dur, aes(x=bud.duration, y=WL2_Total_Fitness, color=pop)) +
   geom_point()
 
-WL2_bud_dur_total_fit <- lmer(Total_Fitness ~ bud.duration + (1|pop),
+WL2_bud_dur_total_fit <- lmer(WL2_Total_Fitness ~ bud.duration + (1|pop),
                               data=WL2_total_fit_bud_dur)
 summary(WL2_bud_dur_total_fit)
 Anova(WL2_bud_dur_total_fit)
+
+bud_dur_seq2 <- seq(min(WL2_total_fit_bud_dur$bud.duration, na.rm = TRUE),
+                   max(WL2_total_fit_bud_dur$bud.duration, na.rm = TRUE))
+newdata_fit2 <- data.frame(bud.duration = bud_dur_seq2)
+newdata_fit2$predicted <- predict(WL2_bud_dur_total_fit,
+                                 newdata = newdata_fit2,
+                                 re.form = NA)
+
+ggplot(WL2_total_fit_bud_dur, aes(x = bud.duration, y = WL2_Total_Fitness, color = elev_m)) +
+  geom_point(alpha = 0.6) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  geom_line(data = newdata_fit2, aes(x = bud.duration, y = predicted),
+            inherit.aes = FALSE,
+            color = "black", size = 1.2) +
+  labs(x = "Bud Duration", y = "Total Fruit Produced") +
+  theme_minimal()
+
 
 
 ggplot(WL2_total_fit_bud_dur, aes(x=bud.date_dt, y=Total_Fitness, color=pop)) +
