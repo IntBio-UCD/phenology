@@ -783,7 +783,7 @@ WL2_24_pop_no_flw <- WL2_24_pop %>%
  # ))
 
 #ALSO CALCULATE DAYS SINCE SNOW MELT TO GET WITHIN GROWING SEASON TIMING
-WL2_24_snow_melt <- mdy("05/27/2024")
+WL2_24_snow_melt <- mdy("05/19/2024")
 
 WL2_24_pop <- WL2_24_pop %>%
   mutate(across(ends_with(".date"),

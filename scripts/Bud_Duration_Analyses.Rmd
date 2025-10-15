@@ -47,6 +47,8 @@ Anova(bud_duration_elev)
 ICtab(bud_dur_int, bud_duration_site, bud_duration_elev) #site fixed with random  pop is the best fit
 
 
+
+
 #Do we want to include year as a random effect because we have 2 years at WL2
 #Do we still see the same pattern removing WL2 2023 individuals?
 #test <- init.repro %>%
@@ -113,8 +115,19 @@ repro_summary <- init.repro %>%
             )
 ```
 
-#### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
+```{r}
+repro_summary %>%
+  filter(N_bud != 1) %>%
+  ggplot(aes(x=site, y=mean_bud_dur, group=pop, color=elev_m)) +
+  geom_point(size=1.5) +
+  geom_line(size=1) +
+  geom_errorbar(aes(ymin=mean_bud_dur-sem_bud_dur, ymax=mean_bud_dur+sem_bud_dur), width=0.1) +
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  ylab("Bud Duration") +
+  xlab("Site")
+```
 
+#### Does budding duration differ by elevation/latitude/pops at WL2? - can I use climate distance here since it is only 1 garden
 ```{r}
 init.repro %>%
   filter(site == "WL2") %>%
@@ -148,6 +161,10 @@ WL2_bud_dur_lat <- lmer(bud.duration ~ Lat + (1|pop),
 summary(WL2_bud_dur_lat)
 Anova(WL2_bud_dur_lat)
 
+```
+
+
+```{r}
 ggplot(WL2_24_bud_dur, aes(x = pop, y = bud.duration, fill = GrwSsn_GD)) +
   geom_boxplot() +
   scale_fill_gradient(low = "#F5A540", high = "#0043F0")
@@ -166,3 +183,37 @@ WL2_bud_dur_wtr <- lmer(bud.duration ~ Wtr_Year_GD + (1|pop),
 summary(WL2_bud_dur_wtr)
 Anova(WL2_bud_dur_wtr) #Water year is significant, less similar has longer bud duration
 ```
+```{r}
+WL2_24_bud_dur_summary_clim_dist <- init.repro%>%
+  filter(site == "WL2" & year == 24) %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_bud = sum(!is.na(bud.duration)),
+            mean_bud_dur = mean(bud.duration, na.rm=(TRUE)),
+            sem_bud_dur = sem(bud.duration, na.rm=(TRUE))
+            ) %>%
+  filter(N_bud > 1) %>%
+  left_join(WL2_24_bud_dur %>% 
+      select(pop, GrwSsn_GD, Wtr_Year_GD) %>% 
+      distinct(),
+    by = "pop")
+
+ggplot(WL2_24_bud_dur_summary_clim_dist, aes(x=pop, y=mean_bud_dur, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_bud_dur - sem_bud_dur, ymax = mean_bud_dur + sem_bud_dur), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Bud Duration")
+
+ggplot(WL2_24_bud_dur_summary_clim_dist, aes(x=GrwSsn_GD, y=mean_bud_dur, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_bud_dur - sem_bud_dur, ymax = mean_bud_dur + sem_bud_dur), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Bud Duration")
+
+ggplot(WL2_24_bud_dur_summary_clim_dist, aes(x=Wtr_Year_GD, y=mean_bud_dur, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_bud_dur - sem_bud_dur, ymax = mean_bud_dur + sem_bud_dur), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Bud Duration")
+```
+
+

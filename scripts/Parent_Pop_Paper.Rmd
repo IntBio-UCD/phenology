@@ -487,8 +487,6 @@ Anova(WL2_fr_dur_wtr_year)
 ```
 
 
-
-
 #### Bud duration and timing at UCD and number of fruits/FrFlN
 
 ```{r}

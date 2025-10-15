@@ -56,6 +56,10 @@ Anova(dt_bud_both_site)
 #### Dt bud reaction norms
 
 ```{r}
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+
 dt_bud_summary <- init.repro %>%
   group_by(pop, site, elev_m) %>%
   summarize(N_bud = sum(!is.na(bud.date_dt)),
@@ -69,7 +73,9 @@ dt_bud_summary %>%
   geom_point(size=1.5) +
   geom_line(size=1) +
   geom_errorbar(aes(ymin=mean_dt_bud-sem_dt_bud, ymax=mean_dt_bud+sem_dt_bud), width=0.1) +
-  scale_colour_gradient(low = "#F5A540", high = "#0043F0")
+  scale_colour_gradient(low = "#F5A540", high = "#0043F0") +
+  ylab("Days to bud") +
+  xlab("Site")
 ```
 
 #### Scaling
@@ -184,40 +190,92 @@ WL2_24_dt_bud <- init.repro %>%
   filter(!(pop %in% c("SQ1", "WR"))) %>%
   left_join(both_clim_dist_WL2_24 %>% select(pop, GrwSsn_GD, Wtr_Year_GD), by="pop")
 
+pop_order <- WL2_24_dt_bud %>%
+  distinct(pop, elev_m) %>%
+  arrange(elev_m) %>%
+  pull(pop)
+
+WL2_24_dt_bud <- WL2_24_dt_bud %>%
+  mutate(pop = factor(pop, levels = pop_order))
+
 ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=elev_m)) +
   geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
+
+GrwSsn_order <- WL2_24_dt_bud %>%
+  distinct(pop, GrwSsn_GD) %>%
+  arrange(GrwSsn_GD) %>%
+  pull(pop)
+
+WL2_24_dt_bud <- WL2_24_dt_bud %>%
+  mutate(pop = factor(pop, levels = GrwSsn_order))
 
 ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
   geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
 
 WL2_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
                           data=WL2_24_dt_bud)
 summary(WL2_dt_bud_GrwSsn)
 Anova(WL2_dt_bud_GrwSsn)
 
+Wtr_Year_order <- WL2_24_dt_bud %>%
+  distinct(pop, Wtr_Year_GD) %>%
+  arrange(Wtr_Year_GD) %>%
+  pull(pop)
+
+WL2_24_dt_bud <- WL2_24_dt_bud %>%
+  mutate(pop = factor(pop, levels = Wtr_Year_order))
+
 ggplot(WL2_24_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
   geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
 
 WL2_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
                           data=WL2_24_dt_bud)
 summary(WL2_dt_bud_WtrYr)
 Anova(WL2_dt_bud_WtrYr)
+
+WL2_24_dt_bud_summary_clim_dist <- init.repro%>%
+  filter(site == "WL2" & year == 24) %>%
+  group_by(pop, site, elev_m) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE))
+            ) %>%
+  left_join(WL2_24_dt_bud %>% 
+      select(pop, GrwSsn_GD, Wtr_Year_GD) %>% 
+      distinct(),
+    by = "pop")
+
+ggplot(WL2_24_dt_bud_summary_clim_dist, aes(x=GrwSsn_GD, y=mean_dt_bud, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
+
+ggplot(WL2_24_dt_bud_summary_clim_dist, aes(x=Wtr_Year_GD, y=mean_dt_bud, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
+
 ```
 
 #### Dt bud at UCD and climate distance
 
 ```{r}
 clim_dist_UCD22_23 <- clim_dist_UCD22_23 %>%
-  rename(pop=parent.pop) %>%
-  rename(GrwSsn_GD=Gowers_Dist)%>%
+  #rename(pop=parent.pop) %>%
+  #rename(GrwSsn_GD=Gowers_Dist)%>%
   filter(TimePd == "Recent")
 
 wtr_year_UCD <- wtr_year_UCD %>%
-  rename(pop=parent.pop) %>%
-  rename(Wtr_Year_GD=Gowers_Dist)%>%
+  #rename(pop=parent.pop) %>%
+  #rename(Wtr_Year_GD=Gowers_Dist)%>%
   filter(TimePd == "Recent")
 
 UCD_dt_bud <- init.repro %>%
@@ -227,21 +285,59 @@ UCD_dt_bud <- init.repro %>%
   left_join(clim_dist_UCD22_23 %>% select(pop, GrwSsn_GD), by="pop") %>%
   left_join(wtr_year_UCD %>% select(pop, Wtr_Year_GD), by="pop")
 
+GrwSsn_order <- UCD_dt_bud %>%
+  distinct(pop, GrwSsn_GD) %>%
+  arrange(GrwSsn_GD) %>%
+  pull(pop)
+
+UCD_dt_bud <- UCD_dt_bud %>%
+  mutate(pop = factor(pop, levels = GrwSsn_order))
+
 ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=GrwSsn_GD)) +
   geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
 
 UCD_dt_bud_GrwSsn <- lmer(bud.date_dt ~ GrwSsn_GD + (1|pop),
                           data=UCD_dt_bud)
 summary(UCD_dt_bud_GrwSsn)
 Anova(UCD_dt_bud_GrwSsn)
 
+Wtr_Year_order <- UCD_dt_bud %>%
+  distinct(pop, Wtr_Year_GD) %>%
+  arrange(Wtr_Year_GD) %>%
+  pull(pop)
+
+UCD_dt_bud <- UCD_dt_bud %>%
+  mutate(pop = factor(pop, levels = Wtr_Year_order))
+
 ggplot(UCD_dt_bud, aes(x=pop, y=bud.date_dt, fill=Wtr_Year_GD)) +
   geom_boxplot() +
-  scale_fill_gradient(low = "#F5A540", high = "#0043F0")
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
 
 UCD_dt_bud_WtrYr <- lmer(bud.date_dt ~ Wtr_Year_GD + (1|pop),
                           data=UCD_dt_bud)
 summary(UCD_dt_bud_WtrYr)
 Anova(UCD_dt_bud_WtrYr)
+
+UCD_dt_bud_summary_clim_dist <- dt_bud_summary %>%
+  filter(site == "UCD") %>%
+   left_join(UCD_dt_bud %>% 
+      select(pop, GrwSsn_GD, Wtr_Year_GD) %>% 
+      distinct(),
+    by = "pop")
+
+ggplot(UCD_dt_bud_summary_clim_dist, aes(x=GrwSsn_GD, y=mean_dt_bud, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
+
+ggplot(UCD_dt_bud_summary_clim_dist, aes(x=Wtr_Year_GD, y=mean_dt_bud, color=elev_m)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  labs(y="Days to bud")
+
 ```
