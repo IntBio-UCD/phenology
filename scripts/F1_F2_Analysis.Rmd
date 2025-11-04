@@ -1,0 +1,886 @@
+---
+title: "UCD and WL2 2024 F1 and F2"
+output: html_document
+date: "2025-10-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(googlesheets4)
+library(lmtest)
+library(car)
+```
+
+```{r}
+WL2_2024 <- read_csv("../input/WL2_2024_Data/WL2_mort_pheno_20241023_corrected.csv")
+WL2_2024_pop_names <- read_csv("../input/WL2_2024_pop_ID.csv")
+```
+Add pop ID to mort/pheno
+```{r}
+WL2_2024_pop <- WL2_2024 %>%
+  left_join(WL2_2024_pop_names)
+```
+Add cross type column
+```{r}
+WL2_2024_pop <- WL2_2024_pop %>%
+  mutate(
+    cross_type = case_when(
+      unique.ID == "buffer" ~ NA_character_,
+      stringr::str_count(pop, "x") == 0 ~ "Parent",
+      stringr::str_count(pop, "x") == 1 ~ "F1",
+      stringr::str_count(pop, "x") == 2 ~ "BC1",
+      stringr::str_count(pop, "x") == 3 ~ "F2",
+      TRUE ~ NA_character_)) %>%
+  mutate()
+```
+
+Apply lubridate
+```{r}
+WL2_2024_pop <- WL2_2024_pop %>%
+  mutate(across(
+    c(bud.date, flower.date, fruit.date, last.FL.date, last.FR.date, death.date, missing.date),
+    mdy))
+```
+
+Search for any rouge dates
+```{r}
+ggplot(WL2_2024_pop, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2024_pop, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2024_pop, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2024_pop, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2024_pop, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+Only parents reproduced in 2024
+```{r}
+F1 <- WL2_2024_pop %>%
+  filter(cross_type == "F1")
+
+F2 <- WL2_2024_pop %>%
+  filter(cross_type == "F2")
+
+BC1 <- WL2_2024_pop %>%
+  filter(cross_type == "BC1")
+```
+
+Start looking at WL2_2025 data - 972 individuals
+```{r}
+WL2_2025 <- read_csv("../input/WL2_2025_Data/WL2_mort_pheno_20250929_corrected.csv")
+
+WL2_2025_pop_names <- read_csv("../input/WL2_2025_pop_ID.csv")
+```
+Update row info to merge in pop.id by bed, row, col, Unique.ID
+
+```{r}
+#are there any unique id's that don't have an associated pop?
+only_in_WL2_2025 <- anti_join(WL2_2025, WL2_2025_pop_names, by = "Unique.ID")
+only_in_WL2_2025_pop_names <- anti_join(WL2_2025_pop_names, WL2_2025, by = "Unique.ID")
+
+#2243 (can't find), 1601 (BH), 2230 ((WL2 x CC) x (YO11 x WL2)) (also bed is lower case c), and 380 ((TM2 x WL2) x (YO11 x WL2)) don't have pop info
+
+WL2_2025 <- WL2_2025 %>%
+  mutate(Unique.ID = if_else(Unique.ID == "2243", "2443", Unique.ID)) %>% #need to update unique ID 2243 to 2443
+  mutate(bed = if_else(bed == "E.", "E", bed)) %>% #Remove . after E for Unique ID 1601
+  mutate(col = if_else(Unique.ID == "380", "C", col)) %>% #Change row of 380 to capital C
+  mutate(bed = if_else(Unique.ID == "2230", "C", bed))#Change bed of 2230 to capital C
+
+```
+
+Add pop ID to mort/pheno
+```{r}
+WL2_2025_pop <- WL2_2025 %>%
+  left_join(WL2_2025_pop_names) %>%
+  rename(pop = pop.id)
+```
+Add cross type column
+```{r}
+WL2_2025_pop <- WL2_2025_pop %>%
+  mutate(
+    cross_type = case_when(
+      Unique.ID == "buffer" ~ NA_character_,
+      stringr::str_count(pop, "x") == 0 ~ "Parent",
+      stringr::str_count(pop, "x") == 1 ~ "F1",
+      stringr::str_count(pop, "x") == 2 ~ "BC1",
+      stringr::str_count(pop, "x") == 3 ~ "F2",
+      TRUE ~ NA_character_))
+```
+
+Apply lubridate
+```{r}
+WL2_2025_pop <- WL2_2025_pop %>%
+  mutate(across(
+    c(bud.date, flower.date, fruit.date, last.FL.date, last.FR.date, death.date, round2.rep.dates),
+    mdy))
+```
+
+Search for any rouge dates 
+```{r}
+ggplot(WL2_2025_pop, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_pop, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_pop, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_pop, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_pop, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+Correct incorrect dates
+```{r}
+WL2_2025_pop_corrected <- WL2_2025_pop %>%
+#bud date:
+  #Bed C, Row 36, Col B, Unique ID 2392 - 8/07/2025
+  #Bed F, Row 11, Col A, Unique ID 2288 - 6/17/2025
+  mutate(bud.date = if_else(Unique.ID == 2392, mdy("08/07/2025"), bud.date)) %>%
+  mutate(bud.date = if_else(Unique.ID == 2288, mdy("06/17/2025"), bud.date)) %>%
+  
+#fruit date:
+  #Bed C, Row 30, Col D, Unique ID 2646 - 8/07/2025
+  mutate(fruit.date = if_else(Unique.ID == 2646, mdy("08/07/2025"), fruit.date)) %>%
+
+#last.FL.date:
+  #Bed D, Row 42, Col C, Unique ID 491 - 7/25/2025
+  #Bed C, Row 49, Col C, Unique ID 2643 - 8/07/2025
+  #Bed C, Row 25, Col B, Unique ID 1459 - 8/14/2025
+  mutate(last.FL.date = if_else(Unique.ID == 491, mdy("07/25/2025"), last.FL.date)) %>%
+  mutate(last.FL.date = if_else(Unique.ID == 2643, mdy("08/07/2025"), last.FL.date)) %>%
+  mutate(last.FL.date = if_else(Unique.ID == 1459, mdy("08/14/2025"), last.FL.date))
+```
+
+Add days to cols - need to switch to using thermal time
+```{r}
+WL2_25_snow_melt <- mdy("5/15/2025") #just a guess for now - need to change to start of experiencing inductive temps
+
+WL2_2025_pop_corrected <- WL2_2025_pop_corrected %>%
+  mutate(across(ends_with(".date"),
+                ~ as.integer(ymd(.) - WL2_25_snow_melt),
+                .names="{.col}_dt"))
+```
+
+Add duration cols - need to think about how to include 2nd repro (is it just adding that time on?)
+```{r}
+WL2_2025_pop_corrected <- WL2_2025_pop_corrected %>%
+  mutate(bud.duration = as.numeric(flower.date_dt - bud.date_dt)) %>%
+  mutate(flower.duration = as.numeric(last.FL.date_dt - flower.date_dt)) %>%
+  mutate(fruit.duration = as.numeric(last.FR.date_dt - fruit.date_dt)) %>%
+  mutate(total.repro.duration = as.numeric(last.FR.date_dt - bud.date_dt)) %>%
+  mutate(initiate.repro = if_else(
+      !is.na(bud.date_dt) | !is.na(flower.date_dt) | 
+      !is.na(fruit.date_dt) | !is.na(last.FR.date_dt) | 
+      !is.na(last.FL.date_dt), 
+      1, 0
+    ))
+
+write.csv(WL2_2025_pop_corrected, "../input/WL2_2025_pheno.csv")
+```
+
+Separate into cross type - 205 missing rows from pop = NA and buffer
+```{r}
+WL2_2025_Parent <- WL2_2025_pop_corrected %>%
+  filter(cross_type == "Parent")
+
+WL2_2025_F1 <- WL2_2025_pop_corrected %>%
+  filter(cross_type == "F1")
+
+WL2_2025_F2 <- WL2_2025_pop_corrected %>%
+  filter(cross_type == "F2")
+
+WL2_2025_BC1 <- WL2_2025_pop_corrected %>%
+  filter(cross_type == "BC1")
+
+WL2_pop_sum <- WL2_2025_pop_corrected %>% 
+  group_by(pop) %>% summarise(n = n())
+```
+
+F1 repro plots - not very many F1's reproduced, are these Y1 or Y2 plants?
+```{r}
+ggplot(WL2_2025_F1, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F1, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F1, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F1, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F1, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+More F2's flowered - F2 vigor? Need to identify Y1 vs Y2
+```{r}
+ggplot(WL2_2025_F2, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F2, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F2, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F2, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_F2, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+Something interesting with TM2 crosses
+```{r}
+ggplot(WL2_2025_BC1, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_BC1, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_BC1, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_BC1, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(WL2_2025_BC1, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+Parent duration plots
+```{r}
+WL2_2025_Parent %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 WL1, DPR, YO7, and YO11 initiated repro - take out? Only 1 YO7 plant left this year and it was the iteroparous perennial?
+  #so left with 3 parent pops with individuals that reproduced: WL2, TM2, and BH
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot( aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot(aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot()
+
+WL2_2025_Parent %>%
+  filter(!(pop %in% c("DPR", "WL1", "YO11", "YO7"))) %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() #almost all WL2 plants started fruiting on the same day!
+```
+F1 repro duration plots
+```{r}
+WL2_2025_F1 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 WV x TM2 initiated repro
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot( aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot( aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F1 %>%
+  filter(pop != "WV x TM2") %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+F2 repro duration plots
+```{r}
+WL2_2025_F2 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 (CC x TM2) x (WL2 x TM2), (DPR x TM2) x (TM2 x WL2), (DPR x WL2) x (TM2 x WL2), (SQ3 x WL2) x (DPR x WL2), (SQ3 x WL2) x (LV1 x WL2), (TM2 x BH) x (TM2 x WL2), (TM2 x WL2) x (DPR x WL2), (TM2 x WL2) x (SQ3 x WL2), (TM2 x WL2) x (TM2 x WL2), (TM2 x WL2) x (WL1 x TM2), (WL1 x WL2) x (WL2 x TM2), (WL2 x CC) x (WL2 x TM2)
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_F2 %>%
+  filter(!(pop %in% c("(CC x TM2) x (WL2 x TM2)", "(DPR x TM2) x (TM2 x WL2)", "(DPR x WL2) x (TM2 x WL2)", "(SQ3 x WL2) x (DPR x WL2)", "(SQ3 x WL2) x (LV1 x WL2)", "(TM2 x BH) x (TM2 x WL2)", "(TM2 x WL2) x (DPR x WL2)", "(TM2 x WL2) x (SQ3 x WL2)", "(TM2 x WL2) x (TM2 x WL2)", "(TM2 x WL2) x (WL1 x TM2)", "(WL1 x WL2) x (WL2 x TM2)", "(WL2 x CC) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+BC1 repro duration plots
+```{r}
+WL2_2025_BC1 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 (TM2 x WL2) x (TM2), (TM2) x (TM2 x WL2), (WL2) x (DPR x WL2), (WL2) x (WL2 x TM2), (WL2) x (WL2 x TM2) initiated repro
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot( aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot( aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+WL2_2025_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x (TM2), (TM2)", "(TM2) x (TM2 x WL2)", "(WL2) x (DPR x WL2)", "(WL2) x (WL2 x TM2)", "(WL2) x (WL2 x TM2)"))) %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+
+Calculate proportion high elevation parent (high > 2000 ft)
+```{r}
+el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
+  filter(`Species Code`=="STTO") %>%
+  mutate(elevation=unlist(`Elevation (m)`)) %>%
+  select(pop.id=`Site code`, elevation) %>%
+  mutate(pop.id=str_replace(pop.id, "YOSE", "YO")) %>%
+  rename(pop = pop.id) %>%
+  filter(pop != "DP") #Need to remove Donner Pass since it is marking DPR as high and low elev
+
+el <- el %>%
+  mutate(high=elevation>2000)
+
+WL2_2025_Parent <- WL2_2025_Parent %>%
+  left_join(el, by = "pop") 
+```
+
+```{r}
+high_regex <- el %>%
+  filter(high, !is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+
+low_regex <- el %>%
+  filter(!high, !is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+
+all_regex <- el %>%
+  filter(!is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+```
+
+```{r}
+WL2_2025_F1 <- WL2_2025_F1 %>%
+  mutate(count.high=str_count(pop, high_regex),
+         count.low=str_count(pop, low_regex),
+         prop.high = count.high / (count.high + count.low),
+         maternal.pop = str_extract(pop, "^[A-Z]{2,3}[1-9]{0,2}"),
+         paternal.pop = str_extract(pop, "[A-Z]{2,3}[1-9]{0,2}$"),
+         maternal.high=str_count(maternal.pop, high_regex),
+         paternal.high=str_count(paternal.pop, high_regex)
+  )
+```
+
+```{r}
+WL2_2025_F2 <- WL2_2025_F2 %>%
+  mutate(
+    maternal.pop = str_extract(pop, "^\\(.*?\\)|[A-Z]{2,3}[1-9]{0,2}"),
+    paternal.pop = str_extract(pop, " \\(.*?\\)$|[A-Z]{2,3}[1-9]{0,2}$") %>% trimws(),
+    maternal.grandmother.pop = str_extract(maternal.pop, "[A-Z]{2,3}[1-9]{0,2}"),
+    maternal.grandmother.high = str_count(maternal.grandmother.pop, high_regex)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    maternal.high = str_count(maternal.pop, high_regex) / str_count(maternal.pop, all_regex),
+    paternal.high = str_count(paternal.pop, high_regex) / str_count(paternal.pop, all_regex),
+    prop.high = mean(c(maternal.high, paternal.high), na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+#I think this works
+WL2_2025_BC1 <- WL2_2025_BC1 %>%
+  mutate(
+    maternal.pop = str_extract(pop, "^\\(.*?\\)|[A-Z]{2,3}[1-9]{0,2}"),
+    paternal.pop = str_extract(pop, " \\(.*?\\)$|[A-Z]{2,3}[1-9]{0,2}$") %>% trimws(),
+    maternal.grandmother.pop = str_extract(maternal.pop, "[A-Z]{2,3}[1-9]{0,2}"),
+    maternal.grandmother.high = str_count(maternal.grandmother.pop, high_regex)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    maternal.high = str_count(maternal.pop, high_regex) / str_count(maternal.pop, all_regex),
+    paternal.high = str_count(paternal.pop, high_regex) / str_count(paternal.pop, all_regex),
+    prop.high = mean(c(maternal.high, paternal.high), na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+Calculate mean and sem of days to event and duration of event
+```{r}
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+
+WL2_2025_Parent_summary <- WL2_2025_Parent %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+
+WL2_2025_F1_summary <- WL2_2025_F1 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+
+WL2_2025_F2_summary <- WL2_2025_F2 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+
+WL2_2025_BC1_summary <- WL2_2025_BC1 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+```
+
+Merge elevation or prop high elev to summary to plot
+```{r}
+WL2_2025_Parent_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_2025_Parent_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_2025_Parent_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_2025_Parent_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_2025_Parent_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+
+WL2_2025_Parent_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(WL2_2025_Parent %>% 
+      select(pop, elevation, high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=elevation)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")
+```
+
+```{r}
+WL2_2025_F1_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_F1_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_F1_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_F1_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_F1_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_F1_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(WL2_2025_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+```
+
+```{r}
+WL2_2025_F2_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+WL2_2025_F2_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+WL2_2025_F2_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+WL2_2025_F2_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+WL2_2025_F2_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+WL2_2025_F2_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(WL2_2025_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+```
+```{r}
+WL2_2025_BC1_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_BC1_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_BC1_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_BC1_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_BC1_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+WL2_2025_BC1_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(WL2_2025_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+```
+
