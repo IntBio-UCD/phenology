@@ -1,0 +1,689 @@
+---
+title: "UCD_F1_F2_Analysis"
+output: html_document
+date: "2025-11-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(lme4)
+library(googlesheets4)
+library(lmtest)
+library(car)
+```
+
+```{r}
+UCD_24_Crosses <- read_csv("../input/UCD_2023_2024_Data/UCD_mort_pheno_20240908_corrected.csv")
+UCD_24_PopID <- read_csv("../input/UCD_24_popID.csv")
+```
+Add pop ID to mort/pheno
+```{r}
+UCD_24_PopID <- UCD_24_PopID %>%
+  mutate(pop.id = if_else(pop.id == "TM2 x (TM2 X WL2)", "TM2 x (TM2 x WL2)", pop.id)) #update X to lowercase so it is recognized in the right cross type
+
+UCD_24_Crosses_pop <- UCD_24_Crosses %>%
+  left_join(UCD_24_PopID) %>%
+  rename(pop = pop.id)
+```
+Add cross type column
+```{r}
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(
+    cross_type = case_when(
+      unique.ID == "buffer" ~ NA_character_,
+      #stringr::str_count(pop, "x") == 0 ~ "Parent",
+      stringr::str_count(pop, "x") == 1 ~ "F1",
+      stringr::str_count(pop, "x") == 2 ~ "BC1",
+      stringr::str_count(pop, "x") == 3 ~ "F2",
+      TRUE ~ NA_character_)) %>%
+  mutate()
+```
+
+Apply lubridate
+```{r}
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(across(
+    c(bud.date, flower.date, fruit.date, last.FL.date, last.FR.date, death.date, missing.date),
+    mdy))
+```
+
+Search for any rouge dates that need to be updated
+```{r}
+ggplot(UCD_24_Crosses_pop, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_24_Crosses_pop, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_24_Crosses_pop, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_24_Crosses_pop, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD_24_Crosses_pop, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+Update incorrect dates
+```{r}
+#Update bud date for 1250 and 1367
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(bud.date = if_else(unique.ID == 1250, mdy("04/19/2024"), bud.date)) %>%
+  mutate(bud.date = if_else(unique.ID == 1367, mdy("03/28/2024"), bud.date))
+
+#Update flower date for 203
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(flower.date = if_else(unique.ID == 203, mdy("05/16/2024"), flower.date))
+
+#Update fruit date for 1241 and 203
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(fruit.date = if_else(unique.ID == 203, mdy("05/16/2024"), fruit.date)) %>%
+  mutate(fruit.date = if_else(unique.ID == 1241, mdy("04/26/2024"), fruit.date))
+
+#Update last.Fl date for 1258
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(last.FL.date = if_else(unique.ID == 1258, mdy("05/31/2024"), last.FL.date)) 
+
+#Update last.Fr date for 246 and 562
+UCD_24_Crosses_pop <- UCD_24_Crosses_pop %>%
+  mutate(last.FR.date = if_else(unique.ID == 246, mdy("05/31/2024"), last.FR.date)) %>%
+  mutate(last.FR.date = if_else(unique.ID == 562, mdy("05/16/2024"), last.FR.date))
+```
+
+Add days to cols - need to switch to using (photo)thermal time
+```{r}
+UCD23_24_planting_date <- mdy("12/04/2023")
+
+UCD_24_Crosses_pop_corrected <- UCD_24_Crosses_pop %>%
+  mutate(across(ends_with(".date"),
+                ~ as.integer(ymd(.) - UCD23_24_planting_date),
+                .names="{.col}_dt"))
+```
+Add duration cols
+```{r}
+UCD_24_Crosses_pop_corrected <- UCD_24_Crosses_pop_corrected %>%
+  mutate(bud.duration = as.numeric(flower.date_dt - bud.date_dt)) %>%
+  mutate(flower.duration = as.numeric(last.FL.date_dt - flower.date_dt)) %>%
+  mutate(fruit.duration = as.numeric(last.FR.date_dt - fruit.date_dt)) %>%
+  mutate(total.repro.duration = as.numeric(last.FR.date_dt - bud.date_dt)) %>%
+  mutate(initiate.repro = if_else(
+      !is.na(bud.date_dt) | !is.na(flower.date_dt) | 
+      !is.na(fruit.date_dt) | !is.na(last.FR.date_dt) | 
+      !is.na(last.FL.date_dt), 
+      1, 0
+    ))
+```
+
+Split into tibbles for each cross type
+```{r}
+UCD23_24_F1 <- UCD_24_Crosses_pop_corrected %>%
+  filter(cross_type == "F1")
+
+UCD23_24_F2 <- UCD_24_Crosses_pop_corrected %>%
+  filter(cross_type == "F2")
+
+UCD23_24_BC1 <- UCD_24_Crosses_pop_corrected %>%
+  filter(cross_type == "BC1") #consider if I want to include these with the F2's - separated for now because that is how the code was written for the WL2 garden plants
+
+UCD23_24_pop_sum <- UCD_24_Crosses_pop_corrected %>% 
+  group_by(pop) %>% summarise(n = n())
+```
+
+F1's histograms colored by genotype
+```{r}
+ggplot(UCD23_24_F1, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F1, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F1, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F1, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F1, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+F2's histograms colored by genotype
+```{r}
+ggplot(UCD23_24_F2, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F2, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F2, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F2, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_F2, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+BC1's histograms colored by genotype
+```{r}
+ggplot(UCD23_24_BC1, aes(x=bud.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_BC1, aes(x=flower.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_BC1, aes(x=fruit.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_BC1, aes(x=last.FL.date, fill=pop)) +
+  geom_histogram()
+
+ggplot(UCD23_24_BC1, aes(x=last.FR.date, fill=pop)) +
+  geom_histogram()
+```
+
+F1's boxplots colored by genotype 
+```{r}
+UCD23_24_F1 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 SQ3 x WL2, WL2 x DPR, WV x WL2 initiated repro
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot(aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot( aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F1 %>%
+  filter(!(pop %in% c("SQ3 x WL2", "WL2 x DPR", "WV x WL2"))) %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+
+F2's boxplots colored by genotype 
+```{r}
+UCD23_24_F2 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+
+UCD23_24_F2 %>%
+  ggplot(aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F2 %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F2 %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F2 %>%
+ ggplot(aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F2 %>%
+ ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_F2 %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+BC1's boxplots colored by genotype 
+```{r}
+UCD23_24_BC1 %>%
+  group_by(pop) %>%
+  summarise(n_initiated = sum(initiate.repro == 1, na.rm = TRUE))
+  #only 1 (TM2 x WL2) x TM2, (YO11 x WL2) x WL2, DPR x (WL2 x DPR) initiated repro
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot( aes(x=bud.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot(aes(x=flower.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot(aes(x=fruit.duration, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot( aes(x=bud.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
+  geom_boxplot() 
+
+UCD23_24_BC1 %>%
+  filter(!(pop %in% c("(TM2 x WL2) x TM2", "(YO11 x WL2) x WL2", "DPR x (WL2 x DPR)"))) %>%
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
+  geom_boxplot() 
+```
+
+Prep to calculate proportion high elevation parent (high > 2000 ft)
+```{r}
+el <- read_sheet("https://docs.google.com/spreadsheets/d/1FORIRL-1J15fD5iPqVyv_EWbc6uhV83-NL8SsjJL0Hw/edit#gid=0") %>% 
+  filter(`Species Code`=="STTO") %>%
+  mutate(elevation=unlist(`Elevation (m)`)) %>%
+  select(pop.id=`Site code`, elevation) %>%
+  mutate(pop.id=str_replace(pop.id, "YOSE", "YO")) %>%
+  rename(pop = pop.id) %>%
+  filter(pop != "DP") #Need to remove Donner Pass since it is marking DPR as high and low elev
+
+el <- el %>%
+  mutate(high=elevation>2000)
+
+high_regex <- el %>%
+  filter(high, !is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+
+low_regex <- el %>%
+  filter(!high, !is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+
+all_regex <- el %>%
+  filter(!is.na(pop)) %>% 
+  pull(pop) %>%
+  str_c(collapse = "|")
+```
+Calculate prop high elev parent for F1's
+```{r}
+UCD23_24_F1 <- UCD23_24_F1 %>%
+  mutate(count.high=str_count(pop, high_regex),
+         count.low=str_count(pop, low_regex),
+         prop.high = count.high / (count.high + count.low),
+         maternal.pop = str_extract(pop, "^[A-Z]{2,3}[1-9]{0,2}"),
+         paternal.pop = str_extract(pop, "[A-Z]{2,3}[1-9]{0,2}$"),
+         maternal.high=str_count(maternal.pop, high_regex),
+         paternal.high=str_count(paternal.pop, high_regex)
+  )
+```
+
+Calculate prop high elev parent for F2's
+```{r}
+UCD23_24_F2 <- UCD23_24_F2 %>%
+  mutate(
+    maternal.pop = str_extract(pop, "^\\(.*?\\)|[A-Z]{2,3}[1-9]{0,2}"),
+    paternal.pop = str_extract(pop, " \\(.*?\\)$|[A-Z]{2,3}[1-9]{0,2}$") %>% trimws(),
+    maternal.grandmother.pop = str_extract(maternal.pop, "[A-Z]{2,3}[1-9]{0,2}"),
+    maternal.grandmother.high = str_count(maternal.grandmother.pop, high_regex)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    maternal.high = str_count(maternal.pop, high_regex) / str_count(maternal.pop, all_regex),
+    paternal.high = str_count(paternal.pop, high_regex) / str_count(paternal.pop, all_regex),
+    prop.high = mean(c(maternal.high, paternal.high), na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+Calculate prop high elev parent for BC1's
+```{r}
+UCD23_24_BC1 <- UCD23_24_BC1 %>%
+  mutate(
+    maternal.pop = str_extract(pop, "^\\(.*?\\)|[A-Z]{2,3}[1-9]{0,2}"),
+    paternal.pop = str_extract(pop, " \\(.*?\\)$|[A-Z]{2,3}[1-9]{0,2}$") %>% trimws(),
+    maternal.grandmother.pop = str_extract(maternal.pop, "[A-Z]{2,3}[1-9]{0,2}"),
+    maternal.grandmother.high = str_count(maternal.grandmother.pop, high_regex)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    maternal.high = str_count(maternal.pop, high_regex) / str_count(maternal.pop, all_regex),
+    paternal.high = str_count(paternal.pop, high_regex) / str_count(paternal.pop, all_regex),
+    prop.high = mean(c(maternal.high, paternal.high), na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+Calculate mean and sem for days to event and duration
+```{r}
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+
+UCD23_24_F1_summary <- UCD23_24_F1 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+
+UCD23_24_F2_summary <- UCD23_24_F2 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+
+UCD23_24_BC1_summary <- UCD23_24_BC1 %>%
+  group_by(pop) %>%
+  summarize(N_bud = sum(!is.na(bud.date_dt)),
+            mean_dt_bud = mean(bud.date_dt, na.rm=(TRUE)),
+            sem_dt_bud = sem(bud.date_dt, na.rm=(TRUE)),
+            N_flw = sum(!is.na(flower.date_dt)),
+            mean_dt_flw = mean(flower.date_dt, na.rm=(TRUE)),
+            sem_dt_flw = sem(flower.date_dt, na.rm=(TRUE)),
+            N_frt = sum(!is.na(fruit.date_dt)),
+            mean_dt_frt = mean(fruit.date_dt, na.rm=(TRUE)),
+            sem_dt_frt = sem(fruit.date_dt, na.rm=(TRUE)),
+            N_bud_dur = sum(!is.na(bud.duration)),
+            mean_dur_bud = mean(bud.duration, na.rm=(TRUE)),
+            sem_dur_bud = sem(bud.duration, na.rm=(TRUE)),
+            N_flw_dur = sum(!is.na(flower.duration)),
+            mean_dur_flw = mean(flower.duration, na.rm=(TRUE)),
+            sem_dur_flw = sem(flower.duration, na.rm=(TRUE)),
+            N_frt_dur = sum(!is.na(fruit.duration)),
+            mean_dur_frt = mean(fruit.duration, na.rm=(TRUE)),
+            sem_dur_frt = sem(fruit.duration, na.rm=(TRUE))
+            )
+```
+
+F1 means w error bars colored by prop high
+```{r}
+UCD23_24_F1_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_F1_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_F1_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_F1_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_F1_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_F1_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(UCD23_24_F1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+```
+F2 means w error bars colored by prop high
+```{r}
+UCD23_24_F2_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+UCD23_24_F2_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+UCD23_24_F2_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+UCD23_24_F2_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+UCD23_24_F2_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+
+UCD23_24_F2_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(UCD23_24_F2 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=5))
+```
+BC1 means w error bars colored by prop high
+```{r}
+UCD23_24_BC1_summary %>%
+  filter(N_bud > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_BC1_summary %>%
+  filter(N_flw > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_BC1_summary %>%
+  filter(N_frt > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_BC1_summary %>%
+  filter(N_bud_dur > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_BC1_summary %>%
+  filter(N_flw_dur > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0")+
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+
+UCD23_24_BC1_summary %>%
+  filter(N_frt_dur > 1) %>%
+  left_join(UCD23_24_BC1 %>% 
+      select(pop, prop.high) %>% 
+      distinct(),
+    by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
+  ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
+  scale_color_gradient(low = "#F5A540", high = "#0043F0") +
+  theme(axis.text.x=element_text(angle=90, hjust=1, size=8))
+```
+
