@@ -1,6 +1,8 @@
 ---
-title: "UCD_F1_F2_Analysis"
-output: html_document
+title: "UCD 2023-2024 Crosses Phenology"
+output:
+  pdf_document: default
+  html_document: default
 date: "2025-11-04"
 ---
 
