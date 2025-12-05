@@ -1,6 +1,8 @@
 ---
-title: "UCD and WL2 2024 F1 and F2"
-output: html_document
+title: "WL2 2025 Crosses Phenology"
+output:
+  pdf_document: default
+  html_document: default
 date: "2025-10-15"
 ---
 
@@ -602,6 +604,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dt_bud, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
@@ -613,6 +616,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dt_flw, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
@@ -624,6 +628,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dt_frt, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
@@ -635,6 +640,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dur_bud, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
@@ -646,6 +652,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dur_flw, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
@@ -657,6 +664,7 @@ WL2_2025_Parent_summary %>%
       select(pop, elevation, high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, elevation)) %>%
   ggplot(aes(x=pop, y=mean_dur_frt, color=elevation)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
@@ -670,6 +678,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
@@ -682,6 +691,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
@@ -694,6 +704,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
@@ -706,6 +717,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
@@ -718,6 +730,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
@@ -730,6 +743,7 @@ WL2_2025_F1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
@@ -744,6 +758,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
@@ -756,6 +771,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
@@ -768,6 +784,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
@@ -780,6 +797,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
@@ -792,6 +810,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
@@ -804,6 +823,7 @@ WL2_2025_F2_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
@@ -817,6 +837,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_bud - sem_dt_bud, ymax = mean_dt_bud + sem_dt_bud), width = 0.02) +
@@ -829,6 +850,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_flw - sem_dt_flw, ymax = mean_dt_flw + sem_dt_flw), width = 0.02) +
@@ -841,6 +863,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dt_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dt_frt - sem_dt_frt, ymax = mean_dt_frt + sem_dt_frt), width = 0.02) +
@@ -853,6 +876,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_bud, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_bud - sem_dur_bud, ymax = mean_dur_bud + sem_dur_bud), width = 0.02) +
@@ -865,6 +889,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_flw, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_flw - sem_dur_flw, ymax = mean_dur_flw + sem_dur_flw), width = 0.02) +
@@ -877,6 +902,7 @@ WL2_2025_BC1_summary %>%
       select(pop, prop.high) %>% 
       distinct(),
     by = "pop") %>%
+  mutate(pop = reorder(pop, prop.high)) %>%
   ggplot(aes(x=pop, y=mean_dur_frt, color=prop.high)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = mean_dur_frt - sem_dur_frt, ymax = mean_dur_frt + sem_dur_frt), width = 0.02) +
