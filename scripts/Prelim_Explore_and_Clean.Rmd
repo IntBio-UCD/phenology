@@ -20,7 +20,9 @@ library(lmtest)
 library(car)
 ```
 
-### UCD 2022-2023 Transplants
+### UCD 2022-2023 Transplants 
+
+#### Load in mort/pheno data
 
 ```{r}
 UCD_pheno_transplant <- read_csv("../input/UCD_2023_Data/UCD_transplants_pheno_mort_20231016_corrected.csv")
@@ -88,15 +90,15 @@ write.csv(UCD_pheno_transplant, "../input/UCD22_23_transplant.csv", row.names = 
 #### Visualize as bud/flower/fruit day from planting
 
 ```{r}
-ggplot(UCD_pheno_transplant, aes(x=bud.date_dfp, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=bud.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
-ggplot(UCD_pheno_transplant, aes(x=flower.date_dfp, fill=pop))+
+ggplot(UCD_pheno_transplant, aes(x=flower.date_dt, fill=pop))+
   geom_histogram() +
   xlab("Days since planting, Flower")
 
-ggplot(UCD_pheno_transplant, aes(x=fruit.date_dfp, fill=pop)) +
+ggplot(UCD_pheno_transplant, aes(x=fruit.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 ```
@@ -263,6 +265,8 @@ UCD_germ_prop %>%
 ```
 
 ### UCD 2023-2024
+
+#### Load in data
 
 ```{r}
 UCD24 <- read_csv("../input/UCD_2023_2024_Data/UCD_mort_pheno_20240908_corrected.csv")
@@ -446,7 +450,7 @@ UCD23_24_planting_date <- mdy("12/04/2023")
 UCD24_pop <- UCD24_pop %>%
   mutate(across(ends_with(".date") & !matches("census.date"),
                 ~ as.integer(ymd(.) - UCD23_24_planting_date),
-                .names="{.col}_dfp"))
+                .names="{.col}_dt"))
 
 write.csv(UCD24_pop, "../input/UCD23_24.csv", row.names=FALSE)
 ```
@@ -456,37 +460,37 @@ write.csv(UCD24_pop, "../input/UCD23_24.csv", row.names=FALSE)
 ```{r}
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=bud.date_dfp, fill=pop)) +
+  ggplot(aes(x=bud.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=flower.date_dfp, fill=pop)) +
+  ggplot(aes(x=flower.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Flower")
 
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=fruit.date_dfp, fill=pop)) +
+  ggplot(aes(x=fruit.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=last.FL.date_dfp, fill=pop)) +
+  ggplot(aes(x=last.FL.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Flower")
 
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=last.FR.date_dfp, fill=pop)) +
+  ggplot(aes(x=last.FR.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Fruit")
 
 UCD24_pop %>%
   filter(!is.na(pop)) %>%
-  ggplot(aes(x=death.date_dfp, fill=pop)) +
+  ggplot(aes(x=death.date_dt, fill=pop)) +
   geom_histogram()
 ```
 
@@ -569,6 +573,8 @@ print(result[, c("pop", "proportion_flower", "proportion_fruit")])
 
 ### WL2 2023
 
+#### Load in data
+
 ```{r}
 WL2_pheno <- read_csv("../input/WL2_2023_Data/WL2_mort_pheno_20231020_corrected.csv")
 ```
@@ -643,19 +649,19 @@ write.csv(WL2_pheno, "../input/WL2_23.csv", row.names = FALSE)
 #### Visualize stage from planting date
 
 ```{r}
-ggplot(WL2_pheno, aes(x=bud.date_dfp, fill=pop)) +
+ggplot(WL2_pheno, aes(x=bud.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
-ggplot(WL2_pheno, aes(x=flower.date_dfp, fill=pop)) +
+ggplot(WL2_pheno, aes(x=flower.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Flower")
 
-ggplot(WL2_pheno, aes(x=fruit.date_dfp, fill=pop)) +
+ggplot(WL2_pheno, aes(x=fruit.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 
-ggplot(WL2_pheno, aes(x=death.date_dfp, fill=pop)) +
+ggplot(WL2_pheno, aes(x=death.date_dt, fill=pop)) +
   geom_histogram()
 ```
 
@@ -705,6 +711,8 @@ WL2_pheno_proportion %>%
 ```
 
 ### WL2 2024
+
+#### Load in data
 
 ```{r}
 WL2_24 <- read_csv("../input/WL2_2024_Data/WL2_mort_pheno_20241023_corrected.csv")
@@ -797,23 +805,23 @@ write.csv(WL2_24_pop, "../input/WL2_24.csv", row.names=FALSE)
 
 ```{r}
 
-ggplot(WL2_24_pop, aes(x=bud.date_dfp, fill=pop)) +
+ggplot(WL2_24_pop, aes(x=bud.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Bud")
 
-ggplot(WL2_24_pop, aes(x=flower.date_dfp, fill=pop)) +
+ggplot(WL2_24_pop, aes(x=flower.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Flower")
 
-ggplot(WL2_24_pop, aes(x=fruit.date_dfp, fill=pop)) +
+ggplot(WL2_24_pop, aes(x=fruit.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Fruit")
 
-ggplot(WL2_24_pop, aes(x=last.FL.date_dfp, fill=pop)) +
+ggplot(WL2_24_pop, aes(x=last.FL.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Flower")
 
-ggplot(WL2_24_pop, aes(x=last.FR.date_dfp, fill=pop)) +
+ggplot(WL2_24_pop, aes(x=last.FR.date_dt, fill=pop)) +
   geom_histogram() +
   xlab("Days since planting, Last Fruit")
 ```
